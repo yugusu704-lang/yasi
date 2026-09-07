@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../domain/models/listening_test_info.dart';
 import '../../domain/models/subtitle_sentence.dart';
 import '../../domain/audio/audio_player_service.dart';
+import '../../domain/diff/sentence_diff_matcher.dart';
 import '../providers/app_providers.dart';
 import 'components/word_lookup_bottom_sheet.dart';
 
@@ -19,8 +20,13 @@ enum MaskMode {
 
 class ListeningWorkbenchScreen extends ConsumerStatefulWidget {
   final ListeningTestInfo test;
+  final int initialSentenceIndex;
 
-  const ListeningWorkbenchScreen({super.key, required this.test});
+  const ListeningWorkbenchScreen({
+    super.key,
+    required this.test,
+    this.initialSentenceIndex = 0,
+  });
 
   @override
   ConsumerState<ListeningWorkbenchScreen> createState() =>
@@ -32,22 +38,37 @@ class _ListeningWorkbenchScreenState
   MaskMode _maskMode = MaskMode.normal;
   final ScrollController _scrollController = ScrollController();
   final List<GlobalKey> _sentenceKeys = [];
+  final Map<int, TextEditingController> _dictationControllers = {};
+  final Map<int, DiffResult?> _dictationResults = {};
+  final Set<int> _expandedDictation = {};
+  final SentenceDiffMatcher _diffMatcher = const SentenceDiffMatcher();
 
   @override
   void initState() {
     super.initState();
     for (int i = 0; i < widget.test.sentences.length; i++) {
       _sentenceKeys.add(GlobalKey());
+      _dictationControllers[i] = TextEditingController();
     }
 
-    // 初始化音频播放源
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(audioPlayerServiceProvider).loadTest(widget.test);
+    // 初始化音频播放源并支持定位到指定题目所在句子
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(audioPlayerServiceProvider).loadTest(widget.test);
+      if (widget.initialSentenceIndex > 0 &&
+          widget.initialSentenceIndex < widget.test.sentences.length) {
+        await ref
+            .read(audioPlayerServiceProvider)
+            .jumpToSentence(widget.initialSentenceIndex);
+        _scrollToSentence(widget.initialSentenceIndex);
+      }
     });
   }
 
   @override
   void dispose() {
+    for (final c in _dictationControllers.values) {
+      c.dispose();
+    }
     _scrollController.dispose();
     super.dispose();
   }
@@ -249,6 +270,52 @@ class _ListeningWorkbenchScreenState
               const Spacer(),
               InkWell(
                 onTap: () {
+                  setState(() {
+                    if (_expandedDictation.contains(index)) {
+                      _expandedDictation.remove(index);
+                    } else {
+                      _expandedDictation.add(index);
+                    }
+                  });
+                },
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: _expandedDictation.contains(index)
+                        ? AppColors.oxfordNavy
+                        : AppColors.paperSurface,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.borderLight),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.edit_note_rounded,
+                        size: 13,
+                        color: _expandedDictation.contains(index)
+                            ? Colors.white
+                            : AppColors.oxfordNavy,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        '听写',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: _expandedDictation.contains(index)
+                              ? Colors.white
+                              : AppColors.oxfordNavy,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () {
                   audioService.jumpToSentence(index);
                   if (!audioService.isPlaying) {
                     audioService.play();
@@ -338,6 +405,233 @@ class _ListeningWorkbenchScreenState
                 color: AppColors.textSecondary,
                 height: 1.3,
               ),
+            ),
+          ],
+
+          // 逐句听写与Diff对比输入区
+          if (_expandedDictation.contains(index) ||
+              (_maskMode == MaskMode.dictation && isCurrent))
+            _buildSentenceDictationBox(s, index),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSentenceDictationBox(SubtitleSentence s, int index) {
+    final controller = _dictationControllers[index];
+    final result = _dictationResults[index];
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.paperBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.mode_edit_outline_rounded,
+                  size: 14, color: AppColors.ieltsCrimson),
+              const SizedBox(width: 4),
+              const Text(
+                '单句听写与抓词检验',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.oxfordNavy,
+                ),
+              ),
+              const Spacer(),
+              if (result != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: result.accuracy >= 0.8
+                        ? AppColors.fsrsGood.withValues(alpha: 0.12)
+                        : AppColors.ieltsCrimson.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '${(result.accuracy * 100).round()}% 准确率',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: result.accuracy >= 0.8
+                          ? AppColors.fsrsGood
+                          : AppColors.ieltsCrimson,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: controller,
+            maxLines: 2,
+            style: const TextStyle(fontSize: 13, height: 1.3),
+            decoration: InputDecoration(
+              hintText: '听音频并输入英文句子，检验连读与拼写...',
+              hintStyle:
+                  const TextStyle(fontSize: 12, color: AppColors.textMuted),
+              contentPadding: const EdgeInsets.all(10),
+              filled: true,
+              fillColor: AppColors.cardSurface,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.borderLight),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.borderLight),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                    color: AppColors.ieltsCrimson, width: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (controller != null && controller.text.isNotEmpty)
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      controller.clear();
+                      _dictationResults[index] = null;
+                    });
+                  },
+                  child: const Text('重练',
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary)),
+                ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.ieltsCrimson,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  minimumSize: const Size(0, 32),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: () {
+                  final text = controller?.text ?? '';
+                  final res = _diffMatcher.diff(
+                    original: s.textEn,
+                    userInput: text,
+                  );
+                  setState(() {
+                    _dictationResults[index] = res;
+                  });
+                },
+                icon: const Icon(Icons.spellcheck_rounded, size: 16),
+                label: const Text('即时对齐对比',
+                    style:
+                        TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          if (result != null) ...[
+            const Divider(height: 16, color: AppColors.borderLight),
+            const Text(
+              '智能错词对齐分析 (绿色:正确 / 橙色:拼写轻误 / 红色:漏听 / 灰色:多余):',
+              style: TextStyle(fontSize: 10, color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: result.tokens.map((token) {
+                switch (token.status) {
+                  case DiffStatus.correct:
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.fsrsGood.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                            color: AppColors.fsrsGood.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        token.text,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.fsrsGood,
+                        ),
+                      ),
+                    );
+                  case DiffStatus.typo:
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                            color: Colors.amber.shade700
+                                .withValues(alpha: 0.4)),
+                      ),
+                      child: Text(
+                        '${token.text} [应为: ${token.expected}]',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.amber.shade900,
+                        ),
+                      ),
+                    );
+                  case DiffStatus.missing:
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.ieltsCrimson.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                            color: AppColors.ieltsCrimson
+                                .withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        '漏: ${token.text}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.ieltsCrimson,
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
+                    );
+                  case DiffStatus.extra:
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '+ ${token.text}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textMuted,
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
+                    );
+                }
+              }).toList(),
             ),
           ],
         ],

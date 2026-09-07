@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../domain/models/listening_test_info.dart';
 import '../providers/app_providers.dart';
 import 'listening_workbench_screen.dart';
+import 'exam_mode_screen.dart';
 
 class ListeningHomeScreen extends ConsumerWidget {
   const ListeningHomeScreen({super.key});
@@ -249,11 +250,81 @@ class ListeningHomeScreen extends ConsumerWidget {
                     style: const TextStyle(
                         fontSize: 12, color: AppColors.textSecondary),
                   ),
-                  const Spacer(),
-                  const Icon(Icons.arrow_forward_ios_rounded,
-                      size: 14, color: AppColors.textMuted),
+                  if (test.questions.isNotEmpty) ...[
+                    const SizedBox(width: 16),
+                    const Icon(Icons.quiz_outlined,
+                        size: 14, color: AppColors.ieltsCrimson),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${test.questions.length} 道原题',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.ieltsCrimson),
+                    ),
+                  ],
                 ],
               ),
+              if (test.questions.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.ieltsCrimson,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 0,
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (ctx) => ExamModeScreen(test: test),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.edit_note_rounded, size: 16),
+                        label: const Text(
+                          '1:1 官方真题模考',
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.oxfordNavy,
+                          side: const BorderSide(color: AppColors.borderLight),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (ctx) =>
+                                  ListeningWorkbenchScreen(test: test),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.headphones_rounded, size: 16),
+                        label: const Text(
+                          '逐句精听与听写',
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

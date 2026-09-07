@@ -1,4 +1,5 @@
 import 'subtitle_sentence.dart';
+import 'exam_question.dart';
 
 class ListeningTestInfo {
   final String testId;
@@ -10,6 +11,7 @@ class ListeningTestInfo {
   final String localAudioPath;
   final int totalDurationMs;
   final List<SubtitleSentence> sentences;
+  final List<ExamQuestion> questions;
   final bool isDownloaded;
   final int playCount;
   final double completionRate;
@@ -24,6 +26,7 @@ class ListeningTestInfo {
     required this.localAudioPath,
     required this.totalDurationMs,
     required this.sentences,
+    this.questions = const [],
     this.isDownloaded = true,
     this.playCount = 0,
     this.completionRate = 0.0,
@@ -45,6 +48,7 @@ class ListeningTestInfo {
               ?.map((e) => SubtitleSentence.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      questions: const [],
       isDownloaded: json['isDownloaded'] as bool? ?? true,
       playCount: json['playCount'] as int? ?? 0,
       completionRate: (json['completionRate'] as num?)?.toDouble() ?? 0.0,

@@ -1,6 +1,7 @@
 import '../../domain/models/word_item.dart';
 import '../../domain/models/listening_test_info.dart';
 import '../../domain/models/subtitle_sentence.dart';
+import '../../domain/models/exam_question.dart';
 
 class DefaultData {
   DefaultData._();
@@ -19,6 +20,78 @@ class DefaultData {
           isDownloaded: true,
           playCount: 1,
           completionRate: 0.8,
+          questions: [
+            ExamQuestion(
+              questionNumber: 1,
+              promptBefore: 'Customer Full Name: Luisa ',
+              promptAfter: '',
+              acceptableAnswers: ['Gould'],
+              targetSentenceIndex: 3,
+            ),
+            ExamQuestion(
+              questionNumber: 2,
+              promptBefore: 'Occupation: ',
+              promptAfter: ' (environmental)',
+              acceptableAnswers: ['consultant'],
+              targetSentenceIndex: 3,
+            ),
+            ExamQuestion(
+              questionNumber: 3,
+              promptBefore: 'Journey Purpose: mainly for ',
+              promptAfter: '',
+              acceptableAnswers: ['commuting'],
+              targetSentenceIndex: 5,
+            ),
+            ExamQuestion(
+              questionNumber: 4,
+              promptBefore: 'Frequency: travels ',
+              promptAfter: ' days a week by train',
+              acceptableAnswers: ['5', 'five'],
+              targetSentenceIndex: 5,
+            ),
+            ExamQuestion(
+              questionNumber: 5,
+              promptBefore: 'Peak service: satisfied with the ',
+              promptAfter: '',
+              acceptableAnswers: ['punctuality'],
+              targetSentenceIndex: 7,
+            ),
+            ExamQuestion(
+              questionNumber: 6,
+              promptBefore: 'Train conditions: carriages are often ',
+              promptAfter: '',
+              acceptableAnswers: ['overcrowded'],
+              targetSentenceIndex: 7,
+            ),
+            ExamQuestion(
+              questionNumber: 7,
+              promptBefore: 'Crowding worst between 8 and ',
+              promptAfter: ' AM',
+              acceptableAnswers: ['9', 'nine'],
+              targetSentenceIndex: 7,
+            ),
+            ExamQuestion(
+              questionNumber: 8,
+              promptBefore: 'Ticket type: monthly ',
+              promptAfter: ' ticket',
+              acceptableAnswers: ['season'],
+              targetSentenceIndex: 8,
+            ),
+            ExamQuestion(
+              questionNumber: 9,
+              promptBefore: 'Fares have risen ',
+              promptAfter: ' this year',
+              acceptableAnswers: ['significantly'],
+              targetSentenceIndex: 9,
+            ),
+            ExamQuestion(
+              questionNumber: 10,
+              promptBefore: 'Cost is hardest on ',
+              promptAfter: ' and interns',
+              acceptableAnswers: ['students'],
+              targetSentenceIndex: 9,
+            ),
+          ],
           sentences: [
             const SubtitleSentence(
               index: 0,

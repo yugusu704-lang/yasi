@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_miuix/miuix.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 import '../../core/theme/app_colors.dart';
 import '../../domain/models/word_item.dart';
 import '../../domain/fsrs/fsrs_card.dart';
@@ -16,24 +15,33 @@ class VocabularyHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
-  int _selectedTab = 0; // 0: FSRS复习, 1: 生词笔记本
+  int _selectedTab = 0; // 0: FSRS卡片, 1: 听音拼写测试, 2: 生词笔记本
   int _currentCardIndex = 0;
   bool _isCardFlipped = false;
-  final FlutterTts _tts = FlutterTts();
+  bool _isBlindListeningMode = false; // 盲听辨义开关
+
+  // 听音拼写测试状态
+  int _spellingIndex = 0;
+  final TextEditingController _spellingController = TextEditingController();
+  bool _spellingChecked = false;
+  bool _spellingCorrect = false;
 
   @override
-  void initState() {
-    super.initState();
-    _tts.setLanguage('en-GB');
-    _tts.setSpeechRate(0.45);
+  void dispose() {
+    _spellingController.dispose();
+    super.dispose();
   }
 
-  Future<void> _speak(String word) async {
-    await _tts.speak(word);
+  void _playUkAudio(String word) {
+    ref.read(audioCacheServiceProvider).playWordUk(word);
+  }
+
+  void _speakSentence(String sentence) {
+    ref.read(audioCacheServiceProvider).speakSentence(sentence);
   }
 
   void _handleFsrsRating(
-      WordItem word, FsrsRating rating, List<WordItem> dueWords) async {
+      WordItem word, FsrsRating rating, List<WordItem> words) async {
     final db = ref.read(databaseProvider);
     final fsrs = ref.read(fsrsAlgorithmProvider);
 
@@ -44,10 +52,46 @@ class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
 
     setState(() {
       _isCardFlipped = false;
-      if (_currentCardIndex < dueWords.length - 1) {
+      if (_currentCardIndex < words.length - 1) {
         _currentCardIndex++;
+        if (_isBlindListeningMode) {
+          _playUkAudio(words[_currentCardIndex].word);
+        }
       } else {
-        _currentCardIndex = dueWords.length; // Finished
+        _currentCardIndex = words.length; // Finished
+      }
+    });
+  }
+
+  void _checkSpelling(WordItem word, List<WordItem> words) async {
+    final input = _spellingController.text.trim().toLowerCase();
+    final target = word.word.trim().toLowerCase();
+    final isCorrect = input == target;
+
+    setState(() {
+      _spellingChecked = true;
+      _spellingCorrect = isCorrect;
+    });
+
+    final db = ref.read(databaseProvider);
+    final fsrs = ref.read(fsrsAlgorithmProvider);
+    final currentCard =
+        await db.getFsrsCard(word.id) ?? FsrsCard.newCard(word.id);
+    final rating = isCorrect ? FsrsRating.good : FsrsRating.again;
+    final updatedCard = fsrs.review(currentCard, rating);
+    await db.saveFsrsCard(updatedCard);
+  }
+
+  void _nextSpellingWord(List<WordItem> words) {
+    setState(() {
+      _spellingChecked = false;
+      _spellingCorrect = false;
+      _spellingController.clear();
+      if (_spellingIndex < words.length - 1) {
+        _spellingIndex++;
+        _playUkAudio(words[_spellingIndex].word);
+      } else {
+        _spellingIndex = words.length;
       }
     });
   }
@@ -70,75 +114,52 @@ class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
             fontFamily: 'serif',
           ),
         ),
+        actions: [
+          if (_selectedTab == 0)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: FilterChip(
+                label: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.hearing_rounded,
+                        size: 14, color: AppColors.ieltsCrimson),
+                    SizedBox(width: 4),
+                    Text('盲听辨义', style: TextStyle(fontSize: 12)),
+                  ],
+                ),
+                selected: _isBlindListeningMode,
+                selectedColor: AppColors.ieltsCrimson.withValues(alpha: 0.15),
+                checkmarkColor: AppColors.ieltsCrimson,
+                onSelected: (val) {
+                  setState(() {
+                    _isBlindListeningMode = val;
+                    _isCardFlipped = false;
+                  });
+                  if (val) {
+                    wordsAsync.whenData((words) {
+                      if (_currentCardIndex < words.length) {
+                        _playUkAudio(words[_currentCardIndex].word);
+                      }
+                    });
+                  }
+                },
+              ),
+            ),
+        ],
       ),
       body: Column(
         children: [
-          // 分段切换器（FSRS 卡片 vs 生词本）
+          // 顶部分段切换器（FSRS卡片 vs 听音拼写测试 vs 生词本）
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _selectedTab = 0),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: _selectedTab == 0
-                            ? AppColors.ieltsCrimson
-                            : AppColors.paperSurface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: _selectedTab == 0
-                              ? AppColors.ieltsCrimson
-                              : AppColors.borderLight,
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'FSRS 记忆卡片',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: _selectedTab == 0
-                              ? Colors.white
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _selectedTab = 1),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: _selectedTab == 1
-                            ? AppColors.ieltsCrimson
-                            : AppColors.paperSurface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: _selectedTab == 1
-                              ? AppColors.ieltsCrimson
-                              : AppColors.borderLight,
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '精听生词本',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: _selectedTab == 1
-                              ? Colors.white
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                _buildSegmentButton(0, 'FSRS 记忆卡片'),
+                const SizedBox(width: 8),
+                _buildSegmentButton(1, '听音拼写测试'),
+                const SizedBox(width: 8),
+                _buildSegmentButton(2, '精听生词本'),
               ],
             ),
           ),
@@ -146,11 +167,51 @@ class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
 
           // 主视图
           Expanded(
-            child: _selectedTab == 0
-                ? _buildFsrsTab(wordsAsync)
-                : _buildNotebookTab(wordsAsync),
+            child: switch (_selectedTab) {
+              0 => _buildFsrsTab(wordsAsync),
+              1 => _buildSpellingTestTab(wordsAsync),
+              _ => _buildNotebookTab(wordsAsync),
+            },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSegmentButton(int index, String title) {
+    final isSelected = _selectedTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedTab = index;
+            if (index == 1) {
+              _spellingChecked = false;
+              _spellingController.clear();
+            }
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          decoration: BoxDecoration(
+            color:
+                isSelected ? AppColors.ieltsCrimson : AppColors.paperSurface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color:
+                  isSelected ? AppColors.ieltsCrimson : AppColors.borderLight,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isSelected ? Colors.white : AppColors.textSecondary,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -180,7 +241,7 @@ class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  '科学间隔算法已更新下次记忆周期',
+                  '已同步至间隔重复记忆模型与发音库',
                   style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 24),
@@ -190,7 +251,7 @@ class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
                     _isCardFlipped = false;
                   }),
                   colors: MiuixButtonDefaults.buttonColorsPrimary(context),
-                  child: const Text('再过一遍'),
+                  child: const Text('重新过一遍'),
                 ),
               ],
             ),
@@ -203,7 +264,7 @@ class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Column(
             children: [
-              // 进度条与指标
+              // 进度条与标签
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -240,7 +301,7 @@ class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
                 child: GestureDetector(
                   onTap: () {
                     setState(() => _isCardFlipped = !_isCardFlipped);
-                    _speak(currentWord.word);
+                    _playUkAudio(currentWord.word);
                   },
                   child: Container(
                     width: double.infinity,
@@ -260,75 +321,133 @@ class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          currentWord.word,
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'serif',
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              currentWord.phoneticUk,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              icon: const Icon(Icons.volume_up_rounded,
-                                  color: AppColors.ieltsCrimson, size: 20),
-                              onPressed: () => _speak(currentWord.word),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-
-                        // 背面释义与真题语境
-                        if (_isCardFlipped) ...[
+                        if (_isBlindListeningMode && !_isCardFlipped) ...[
+                          // 盲听模式正面：隐藏文字，强化听音能力
                           Container(
-                            padding: const EdgeInsets.all(12),
+                            width: 80,
+                            height: 80,
                             decoration: BoxDecoration(
-                              color: AppColors.paperSurface,
-                              borderRadius: BorderRadius.circular(12),
+                              color:
+                                  AppColors.ieltsCrimson.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
                             ),
-                            child: Text(
-                              currentWord.definitionZh,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
-                              textAlign: TextAlign.center,
+                            child: IconButton(
+                              icon: const Icon(Icons.volume_up_rounded,
+                                  size: 44, color: AppColors.ieltsCrimson),
+                              onPressed: () => _playUkAudio(currentWord.word),
                             ),
                           ),
-                          if (currentWord.contextSentenceEn.isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            Text(
-                              '"${currentWord.contextSentenceEn}"',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontStyle: FontStyle.italic,
-                                color: AppColors.textSecondary,
+                          const SizedBox(height: 20),
+                          const Text(
+                            '🎧 盲听英音辨义',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                              fontFamily: 'serif',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            '在大脑中回忆拼写与中文释义\n轻触卡片查看答案',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              height: 1.4,
+                            ),
+                          ),
+                        ] else ...[
+                          // 常规正面或翻转后的背面
+                          Text(
+                            currentWord.word,
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'serif',
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                currentWord.phoneticUk,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
-                              textAlign: TextAlign.center,
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.volume_up_rounded,
+                                    color: AppColors.ieltsCrimson, size: 22),
+                                onPressed: () =>
+                                    _playUkAudio(currentWord.word),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+
+                          if (_isCardFlipped) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: AppColors.paperSurface,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                currentWord.definitionZh,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            if (currentWord.contextSentenceEn.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              Text(
+                                '"${currentWord.contextSentenceEn}"',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontStyle: FontStyle.italic,
+                                  color: AppColors.textSecondary,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 8),
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.oxfordNavy,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  side: const BorderSide(
+                                      color: AppColors.borderLight),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20)),
+                                ),
+                                onPressed: () => _speakSentence(
+                                    currentWord.contextSentenceEn),
+                                icon: const Icon(Icons.play_arrow_rounded,
+                                    size: 16),
+                                label: const Text('原声语境例句朗读',
+                                    style: TextStyle(fontSize: 11)),
+                              ),
+                            ],
+                          ] else ...[
+                            const SizedBox(height: 40),
+                            const Text(
+                              '轻触卡片翻看释义与真题例句',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textMuted,
+                              ),
                             ),
                           ],
-                        ] else ...[
-                          const SizedBox(height: 40),
-                          const Text(
-                            '轻触卡片翻看释义与语境例句',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textMuted,
-                            ),
-                          ),
                         ],
                       ],
                     ),
@@ -361,6 +480,274 @@ class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
                   }),
                 ],
               ),
+            ],
+          ),
+        );
+      },
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: AppColors.ieltsCrimson),
+      ),
+      error: (err, _) => Center(child: Text('加载失败: $err')),
+    );
+  }
+
+  Widget _buildSpellingTestTab(AsyncValue<List<WordItem>> wordsAsync) {
+    return wordsAsync.when(
+      data: (words) {
+        if (words.isEmpty) {
+          return const Center(child: Text('词库为空'));
+        }
+
+        if (_spellingIndex >= words.length) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.verified_rounded,
+                    size: 64, color: AppColors.fsrsGood),
+                const SizedBox(height: 16),
+                const Text(
+                  '🎉 恭喜！本组听音拼写测试已全部完成',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                MiuixButton(
+                  onPressed: () => setState(() {
+                    _spellingIndex = 0;
+                    _spellingChecked = false;
+                    _spellingController.clear();
+                  }),
+                  colors: MiuixButtonDefaults.buttonColorsPrimary(context),
+                  child: const Text('重新测试一遍'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final word = words[_spellingIndex];
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            children: [
+              // 进度指示
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '拼写测试: ${_spellingIndex + 1} / ${words.length}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    word.ieltsTag,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.ieltsCrimson),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // 播放英音核心交互按钮
+              GestureDetector(
+                onTap: () => _playUkAudio(word.word),
+                child: Container(
+                  width: 90,
+                  height: 90,
+                  decoration: BoxDecoration(
+                    color: AppColors.ieltsCrimson.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.ieltsCrimson.withValues(alpha: 0.3),
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.volume_up_rounded,
+                    size: 48,
+                    color: AppColors.ieltsCrimson,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                '轻触播放真人英音发音',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 24),
+
+              // 中文提示
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.cardSurface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.borderLight),
+                ),
+                child: Text(
+                  '中文释义：${word.definitionZh}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 拼写输入框
+              TextField(
+                controller: _spellingController,
+                readOnly: _spellingChecked,
+                autocorrect: false,
+                textCapitalization: TextCapitalization.none,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(
+                  hintText: '输入英文拼写...',
+                  hintStyle: const TextStyle(
+                      fontSize: 14, color: AppColors.textMuted),
+                  filled: true,
+                  fillColor: AppColors.cardSurface,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.borderLight),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                        color: AppColors.ieltsCrimson, width: 1.8),
+                  ),
+                ),
+                onSubmitted: (_) {
+                  if (!_spellingChecked) _checkSpelling(word, words);
+                },
+              ),
+              const SizedBox(height: 20),
+
+              // 检查结果展示
+              if (_spellingChecked) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: _spellingCorrect
+                        ? AppColors.fsrsGood.withValues(alpha: 0.1)
+                        : AppColors.ieltsCrimson.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: _spellingCorrect
+                          ? AppColors.fsrsGood
+                          : AppColors.ieltsCrimson,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _spellingCorrect
+                                ? Icons.check_circle_rounded
+                                : Icons.cancel_rounded,
+                            color: _spellingCorrect
+                                ? AppColors.fsrsGood
+                                : AppColors.ieltsCrimson,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _spellingCorrect ? '拼写完全正确！' : '拼写有误',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: _spellingCorrect
+                                  ? AppColors.fsrsGood
+                                  : AppColors.ieltsCrimson,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '标准拼写: ${word.word}   ${word.phoneticUk}',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      if (word.contextSentenceEn.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          '"${word.contextSentenceEn}"',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: AppColors.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.ieltsCrimson,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () => _nextSpellingWord(words),
+                    child: const Text(
+                      '下一词',
+                      style:
+                          TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.oxfordNavy,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () => _checkSpelling(word, words),
+                    child: const Text(
+                      '确认核对',
+                      style:
+                          TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         );
@@ -414,29 +801,47 @@ class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
               child: Material(
                 color: Colors.transparent,
                 child: ListTile(
-                  title: Text(
-                    word.word,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'serif',
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  title: Row(
                     children: [
+                      Text(
+                        word.word,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'serif',
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       Text(
                         word.phoneticUk,
                         style: const TextStyle(
                             fontSize: 12, color: AppColors.textMuted),
                       ),
+                    ],
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       const SizedBox(height: 2),
                       Text(
                         word.definitionZh,
                         style: const TextStyle(
                             fontSize: 13, color: AppColors.textSecondary),
                       ),
+                      if (word.contextSentenceEn.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '"${word.contextSentenceEn}"',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                            color: AppColors.textMuted,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ],
                   ),
                   trailing: Row(
@@ -444,9 +849,18 @@ class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.volume_up_rounded,
-                            color: AppColors.oxfordNavy, size: 20),
-                        onPressed: () => _speak(word.word),
+                            color: AppColors.ieltsCrimson, size: 20),
+                        tooltip: '真人英音',
+                        onPressed: () => _playUkAudio(word.word),
                       ),
+                      if (word.contextSentenceEn.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.play_circle_outline_rounded,
+                              color: AppColors.oxfordNavy, size: 20),
+                          tooltip: '朗读例句',
+                          onPressed: () =>
+                              _speakSentence(word.contextSentenceEn),
+                        ),
                       IconButton(
                         icon: Icon(
                           word.isFavorite

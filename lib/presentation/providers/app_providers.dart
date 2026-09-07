@@ -5,6 +5,7 @@ import '../../domain/models/listening_test_info.dart';
 import '../../domain/audio/audio_player_service.dart';
 import '../../domain/fsrs/fsrs_algorithm.dart';
 import '../../domain/fsrs/fsrs_card.dart';
+import '../../data/remote/audio_cache_service.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   return AppDatabase.instance;
@@ -16,6 +17,12 @@ final fsrsAlgorithmProvider = Provider<FsrsAlgorithm>((ref) {
 
 final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
   final service = AudioPlayerService();
+  ref.onDispose(() => service.dispose());
+  return service;
+});
+
+final audioCacheServiceProvider = Provider<AudioCacheService>((ref) {
+  final service = AudioCacheService();
   ref.onDispose(() => service.dispose());
   return service;
 });
