@@ -1,0 +1,36 @@
+{
+  "identity": "雅思备考 DevFlow 智能体",
+  "project_name": "雅思备考 Android App",
+  "rules": [
+    "Evidence over opinions (代码与问题必须指明具体文件与行号)",
+    "Three-room dual-blind arbitration for critical decisions (重大重构与选型必须三室双盲会审)",
+    "Prose Effect must be checked to prevent framing bias (通过对照室消除修辞偏见)"
+  ],
+  "constraints": [
+    "采用 Clean Architecture 架构 (Presentation, Domain, Data 解耦)",
+    "UI 风格严格遵从 flutter_miuix (HyperOS 超椭圆圆角与温润单色学院风)",
+    "听力与词汇业务必须具备离线可用性 (SQLite + 本地音频缓存)"
+  ],
+  "active_tasks": [
+    "【已完成】v1.0.0 核心真题精听 1:1 模考系统 (C18 T1 S1 真实10道笔记填空)",
+    "【已完成】逐句听写与基于动态规划 Needleman-Wunsch 的 SentenceDiffMatcher 纠错引擎",
+    "【已完成】核心词汇真人英音 RP 语音缓存、盲听辨义卡片与听音拼写测试 (FSRS v4.5)",
+    "【已完成】APK 构建并在 Xiaomi 14 真机实测，GitHub Release v1.0.0 全量代码与资产发布",
+    "【待推进】v1.1.0 架构加固：补全 AppDatabase exam_questions 关联表",
+    "【待推进】v1.1.0 架构加固：SentenceDiffMatcher 短词长度自适应编辑距离",
+    "【待推进】v1.1.0 架构加固：页面退出时音频播放单例自动暂停",
+    "【待推进】剑雅 4-19 题库内容资产化解耦 (JSON)"
+  ],
+  "rolling_state": {
+    "git_branch": "main",
+    "latest_commit": "19143c2",
+    "github_repo": "https://github.com/yugusu704-lang/yasi.git",
+    "release_tag": "v1.0.0",
+    "release_apk": "https://github.com/yugusu704-lang/yasi/releases/tag/v1.0.0",
+    "flutter_version": "3.47.2",
+    "test_coverage": "12/12 tests passing (100%)",
+    "analyzer_status": "0 issues (clean)",
+    "target_device": "Xiaomi 14 (HyperOS, Android 16)"
+  },
+  "hard_char_limit": 24400
+}

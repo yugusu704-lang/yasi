@@ -31,9 +31,9 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 build/
-**/build/
-.devflow_data/
-/coverage/
+.devflow_data/*
+!.devflow_data/ocs.json
+!.devflow_data/memory_store/
 
 # Symbolication related
 app.*.symbols

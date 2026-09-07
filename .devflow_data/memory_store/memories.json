@@ -1,0 +1,62 @@
+[
+  {
+    "id": "mem_1788767822697",
+    "title": "项目架构与核心技术栈 (Architecture & Stack)",
+    "content": "雅思备考 Android App 基于 Flutter 3.47.2、Dart 3.13.2 构建。UI 采用 flutter_miuix 1.1.1（小米 HyperOS 设计系统，超椭圆曲率卡片与 Folme 物理动效），主题为 Warm Monochrome 学院质感（米白 #FBFBF9、深红 #9E2A2B、藏青 #1D2D44）。状态管理采用 Riverpod 3.x (AsyncNotifier)，本地持久化采用 SQLite (sqflite)，音频采用 just_audio + audio_service，遵循 Clean Architecture (Presentation, Domain, Data) 解耦。",
+    "category": "adr",
+    "created_at": 1788767822.697543,
+    "updated_at": 1788767822.697543,
+    "access_count": 0,
+    "version": 1,
+    "superseded_by": null,
+    "is_archived": false
+  },
+  {
+    "id": "mem_1788767822702",
+    "title": "剑雅 1:1 官方模考与逐句听写 Diff 引擎 (Listening Exam & Dictation)",
+    "content": "真题精听模块录入了 Cambridge 18 Test 1 Section 1 真实 10 道笔记填空题（Transport Survey）。支持大小写不敏感、标点符号脱敏、多重备选答案（5/five）容错判分与 Band 预测。逐句精听集成了基于动态规划 Needleman-Wunsch 与 Levenshtein 最小编辑距离算法的 SentenceDiffMatcher，支持正确（绿）、拼写轻误（黄提示应为）、漏词（红划线）、多余（灰划线）四维实时对齐。",
+    "category": "feature",
+    "created_at": 1788767822.702684,
+    "updated_at": 1788767822.702684,
+    "access_count": 0,
+    "version": 1,
+    "superseded_by": null,
+    "is_archived": false
+  },
+  {
+    "id": "mem_1788767822703",
+    "title": "核心词汇听力赋能与 FSRS 记忆曲线 (Vocabulary & FSRS)",
+    "content": "词汇模块集成 AudioCacheService，优先拉取 Oxford/Cambridge 标准英音 RP MP3 并缓存至本地沙盒，脱网优雅降级为本地 TTS。支持盲听辨义卡片模式（隐藏拼写先听后看）与听音拼写默写测试。记忆调度采用 FSRS v4.5（Free Spaced Repetition Scheduler）数学算法，根据 Again/Hard/Good/Easy 四档反馈动态演进稳定性与复习间隔。",
+    "category": "feature",
+    "created_at": 1788767822.7037299,
+    "updated_at": 1788767833.1436234,
+    "access_count": 1,
+    "version": 1,
+    "superseded_by": null,
+    "is_archived": false
+  },
+  {
+    "id": "mem_1788767822704",
+    "title": "v1.0.0 发布与远端仓库归档 (Release & GitHub)",
+    "content": "项目代码已全量推送至 GitHub 主分支：https://github.com/yugusu704-lang/yasi.git。Tag v1.0.0 已发布，构建的 185MB Android 安装包 ielts-prep-v1.0.0.apk 已挂载至 GitHub Release：https://github.com/yugusu704-lang/yasi/releases/tag/v1.0.0。",
+    "category": "release",
+    "created_at": 1788767822.704719,
+    "updated_at": 1788767822.704719,
+    "access_count": 0,
+    "version": 1,
+    "superseded_by": null,
+    "is_archived": false
+  },
+  {
+    "id": "mem_1788767822705",
+    "title": "DevFlow 三室双盲审查防线建议 (AI Lab Retrospective Safeguards)",
+    "content": "AI Lab 三室审查（think_tank, dumb_tank, committee）一致批准 v1.0.0，Prose Effect = SAME。提出的 5 大架构加固防线包括：1. AppDatabase 补充 exam_questions 关系表；2. SentenceDiffMatcher 优化短词长度自适应编辑距离与回溯保底；3. 界面退出时主动暂停音频单例；4. AudioCacheService 校验 MP3 二进制文件头防 Wi-Fi 登录页污染；5. 试题与音频外置为独立 JSON 资产以支持剑雅 4-19 规模化。",
+    "category": "safeguard",
+    "created_at": 1788767822.7056499,
+    "updated_at": 1788767822.7056499,
+    "access_count": 0,
+    "version": 1,
+    "superseded_by": null,
+    "is_archived": false
+  }
+]
