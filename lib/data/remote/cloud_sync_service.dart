@@ -295,9 +295,13 @@ class CloudSyncService {
               }
             }
 
-            // 护栏 2: 严密二进制魔数 (Magic Bytes) 校验与非音频流拦截
+            // 护栏 2: 严密二进制魔数 (Magic Bytes) 校验与预期文件体积完整性门禁
             final fileLen = await tempAudioFile.length();
-            if (fileLen > 10000) {
+            final bool sizeValid = entry.audioSize > 0
+                ? (fileLen >= (entry.audioSize * 0.90))
+                : (fileLen > 10000);
+
+            if (sizeValid) {
               final headerBytes = await tempAudioFile.openRead(0, 64).first;
               final headerStr =
                   String.fromCharCodes(headerBytes).toLowerCase();

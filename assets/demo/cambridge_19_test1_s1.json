@@ -1,0 +1,420 @@
+{
+  "testId": "c19_t1_s1",
+  "book": "Cambridge 19",
+  "testNumber": 1,
+  "section": 1,
+  "title": "C19 Test 1 Section 1: Hinchingbrooke Country Park",
+  "localAudioPath": "assets/demo/c19_t1_s1.mp3",
+  "totalDurationMs": 472000,
+  "totalQuestions": 10,
+  "instructions": "Complete the notes below. Write ONE WORD AND/OR A NUMBER for each answer.",
+  "questions": [
+    {
+      "questionNumber": 1,
+      "promptBefore": "Area: ",
+      "promptAfter": " hectares",
+      "acceptableAnswers": [
+        "69"
+      ],
+      "targetSentenceIndex": 3
+    },
+    {
+      "questionNumber": 2,
+      "promptBefore": "Wetland: lakes, ponds, and a ",
+      "promptAfter": "",
+      "acceptableAnswers": [
+        "stream"
+      ],
+      "targetSentenceIndex": 5
+    },
+    {
+      "questionNumber": 3,
+      "promptBefore": "Children look at ",
+      "promptAfter": " about plants, etc.",
+      "acceptableAnswers": [
+        "data",
+        "information"
+      ],
+      "targetSentenceIndex": 8
+    },
+    {
+      "questionNumber": 4,
+      "promptBefore": "Includes learning to use a ",
+      "promptAfter": " and compass",
+      "acceptableAnswers": [
+        "map"
+      ],
+      "targetSentenceIndex": 10
+    },
+    {
+      "questionNumber": 5,
+      "promptBefore": "Mostly concentrates on the park's ",
+      "promptAfter": "",
+      "acceptableAnswers": [
+        "visitors",
+        "visitor"
+      ],
+      "targetSentenceIndex": 12
+    },
+    {
+      "questionNumber": 6,
+      "promptBefore": "Children make ",
+      "promptAfter": " with natural materials",
+      "acceptableAnswers": [
+        "sounds",
+        "sound",
+        "music",
+        "instruments"
+      ],
+      "targetSentenceIndex": 15
+    },
+    {
+      "questionNumber": 7,
+      "promptBefore": "They give children a feeling of ",
+      "promptAfter": " that they may not have elsewhere",
+      "acceptableAnswers": [
+        "freedom"
+      ],
+      "targetSentenceIndex": 18
+    },
+    {
+      "questionNumber": 8,
+      "promptBefore": "Children learn new ",
+      "promptAfter": " and gain self-confidence",
+      "acceptableAnswers": [
+        "skills",
+        "skill"
+      ],
+      "targetSentenceIndex": 19
+    },
+    {
+      "questionNumber": 9,
+      "promptBefore": "Cost per child: £",
+      "promptAfter": "",
+      "acceptableAnswers": [
+        "4.95",
+        "4.95 pounds"
+      ],
+      "targetSentenceIndex": 21
+    },
+    {
+      "questionNumber": 10,
+      "promptBefore": "Adults, such as ",
+      "promptAfter": ", free",
+      "acceptableAnswers": [
+        "leaders",
+        "teachers",
+        "group leaders",
+        "leader"
+      ],
+      "targetSentenceIndex": 23
+    }
+  ],
+  "sentences": [
+    {
+      "index": 0,
+      "startMs": 1000,
+      "endMs": 34000,
+      "textEn": "Cambridge IELTS 19, Listening Test 1. Section 1. You will hear a telephone conversation between a park ranger and a teacher. First, you have some time to look at questions 1 to 5.",
+      "textZh": "剑桥雅思 19 听力测试 1，第一部分。你将听到公园管理员与一位教师之间的电话对话。首先，你有时间查看第 1 至 5 题。",
+      "keyWords": [
+        "Cambridge",
+        "IELTS",
+        "Listening",
+        "questions"
+      ]
+    },
+    {
+      "index": 1,
+      "startMs": 35000,
+      "endMs": 42000,
+      "textEn": "Good morning, Hinchingbrooke Country Park, Sally speaking, one of the rangers.",
+      "textZh": "早上好，这里是欣钦布鲁克国家公园，我是护林管理员萨莉。",
+      "keyWords": [
+        "Hinchingbrooke",
+        "rangers"
+      ]
+    },
+    {
+      "index": 2,
+      "startMs": 42500,
+      "endMs": 52000,
+      "textEn": "Hello, my name is John Chapman, a teaching assistant at a local primary school arranging a visit for our classes.",
+      "textZh": "您好，我是约翰·查普曼，当地一所小学的助教，正在为我们班级的参观活动做安排。",
+      "keyWords": [
+        "assistant",
+        "primary",
+        "arranging"
+      ]
+    },
+    {
+      "index": 3,
+      "startMs": 52500,
+      "endMs": 68000,
+      "textEn": "Altogether the park covers 170 acres, that's 69 hectares, with wetland, grassland and woodland.",
+      "textZh": "公园总共占地 170 英亩，也就是 69 公顷，包含湿地、草地和林地三种栖息地。",
+      "keyWords": [
+        "acres",
+        "hectares",
+        "wetland",
+        "grassland",
+        "woodland"
+      ]
+    },
+    {
+      "index": 4,
+      "startMs": 68500,
+      "endMs": 82000,
+      "textEn": "The woods are well established with an oak plantation and various bird species and wildlife like deer.",
+      "textZh": "森林历史悠久，拥有橡树种植林以及多种鸟类和野生动物（如鹿）。",
+      "keyWords": [
+        "established",
+        "plantation",
+        "wildlife"
+      ]
+    },
+    {
+      "index": 5,
+      "startMs": 82500,
+      "endMs": 96000,
+      "textEn": "For the wetland habitat, we have two large lakes, several ponds, and a stream running through.",
+      "textZh": "至于湿地环境，我们有两个大湖、数个池塘以及一条穿流而过的小溪。",
+      "keyWords": [
+        "wetland",
+        "lakes",
+        "ponds",
+        "stream"
+      ]
+    },
+    {
+      "index": 6,
+      "startMs": 96500,
+      "endMs": 108000,
+      "textEn": "That sounds wonderful. What subjects do you usually cover on educational school visits?",
+      "textZh": "听起来太棒了。你们在学校教学参访中通常涵盖哪些学科？",
+      "keyWords": [
+        "educational",
+        "subjects"
+      ]
+    },
+    {
+      "index": 7,
+      "startMs": 108500,
+      "endMs": 118000,
+      "textEn": "We offer science, geography, history, leisure and tourism, as well as art and music.",
+      "textZh": "我们提供科学、地理、历史、休闲旅游以及艺术与音乐等课程。",
+      "keyWords": [
+        "science",
+        "geography",
+        "history",
+        "leisure"
+      ]
+    },
+    {
+      "index": 8,
+      "startMs": 118500,
+      "endMs": 132000,
+      "textEn": "In science, children look at real data about plants and habitats that our team has recorded.",
+      "textZh": "在科学课中，孩子们会查看我们团队记录的关于植物和栖息地的真实数据。",
+      "keyWords": [
+        "science",
+        "data",
+        "plants",
+        "recorded"
+      ]
+    },
+    {
+      "index": 9,
+      "startMs": 132500,
+      "endMs": 142000,
+      "textEn": "And for geography? Many of our children find map skills challenging.",
+      "textZh": "那么地理课呢？我们很多孩子觉得看地图技能挺有挑战性的。",
+      "keyWords": [
+        "geography",
+        "challenging"
+      ]
+    },
+    {
+      "index": 10,
+      "startMs": 142500,
+      "endMs": 156000,
+      "textEn": "In geography, children learn orientation and how to navigate using a map and compass.",
+      "textZh": "在地理课上，孩子们学习方向辨别，以及如何使用地图和指南针进行导航。",
+      "keyWords": [
+        "orientation",
+        "navigate",
+        "map",
+        "compass"
+      ]
+    },
+    {
+      "index": 11,
+      "startMs": 156500,
+      "endMs": 166000,
+      "textEn": "In history, we study the changes in local land use over the past century.",
+      "textZh": "在历史课上，我们研究过去一个世纪当地土地利用方式的演变。",
+      "keyWords": [
+        "history",
+        "century"
+      ]
+    },
+    {
+      "index": 12,
+      "startMs": 166500,
+      "endMs": 180000,
+      "textEn": "For leisure and tourism, the module mostly concentrates on the park's visitors and how we manage facilities.",
+      "textZh": "在休闲旅游方面，课程主要聚焦于公园的游客以及我们如何管理各项公共设施。",
+      "keyWords": [
+        "leisure",
+        "tourism",
+        "concentrates",
+        "visitors",
+        "facilities"
+      ]
+    },
+    {
+      "index": 13,
+      "startMs": 180500,
+      "endMs": 195000,
+      "textEn": "That is a comprehensive range of subjects. What about creative arts and practical activities?",
+      "textZh": "科目真全面。那么创意艺术和实践动手活动方面呢？",
+      "keyWords": [
+        "comprehensive",
+        "creative"
+      ]
+    },
+    {
+      "index": 14,
+      "startMs": 195500,
+      "endMs": 225000,
+      "textEn": "Before you hear the rest of the talk, you have some time to look at questions 6 to 10.",
+      "textZh": "在听对话余下部分前，你有时间查看第 6 至 10 题。",
+      "keyWords": [
+        "questions",
+        "talk"
+      ]
+    },
+    {
+      "index": 15,
+      "startMs": 225500,
+      "endMs": 245000,
+      "textEn": "In our music sessions, children make sounds with natural materials like twigs and stones, exploring rhythm.",
+      "textZh": "在音乐环节中，孩子们使用树枝和石块等天然材料发出声音，探索节拍与韵律。",
+      "keyWords": [
+        "sessions",
+        "sounds",
+        "natural",
+        "materials",
+        "rhythm"
+      ]
+    },
+    {
+      "index": 16,
+      "startMs": 245500,
+      "endMs": 260000,
+      "textEn": "That sounds like great fun. Our students love sensory outdoor learning.",
+      "textZh": "听起来太有趣了。我们的学生非常喜欢感官户外学习。",
+      "keyWords": [
+        "sensory",
+        "outdoor"
+      ]
+    },
+    {
+      "index": 17,
+      "startMs": 260500,
+      "endMs": 275000,
+      "textEn": "Teachers often mention the huge benefits of outdoor educational visits for pupils.",
+      "textZh": "老师们经常向我们反馈户外教学参访对小学生带来的巨大益处。",
+      "keyWords": [
+        "benefits",
+        "pupils"
+      ]
+    },
+    {
+      "index": 18,
+      "startMs": 275500,
+      "endMs": 295000,
+      "textEn": "They frequently say it gives children a feeling of freedom that they rarely experience in urban environments.",
+      "textZh": "他们常说这带给孩子们一种在城市环境中很难体会到的自由感。",
+      "keyWords": [
+        "feeling",
+        "freedom",
+        "rarely",
+        "urban"
+      ]
+    },
+    {
+      "index": 19,
+      "startMs": 295500,
+      "endMs": 315000,
+      "textEn": "Children learn new skills through hands-on discovery and gain tremendous self-confidence.",
+      "textZh": "孩子们通过亲手探索学到新技能，并建立起极大的自信心。",
+      "keyWords": [
+        "skills",
+        "discovery",
+        "tremendous",
+        "self-confidence"
+      ]
+    },
+    {
+      "index": 20,
+      "startMs": 315500,
+      "endMs": 330000,
+      "textEn": "Could you explain the costs and admission fees for visiting school groups?",
+      "textZh": "您能说明一下学校团体参访的费用和门票收费标准吗？",
+      "keyWords": [
+        "costs",
+        "admission"
+      ]
+    },
+    {
+      "index": 21,
+      "startMs": 330500,
+      "endMs": 350000,
+      "textEn": "The fee is kept very affordable at 4.95 pounds per child for the guided ranger workshop.",
+      "textZh": "费用非常亲民，带护林员向导的工作坊每名儿童仅需 4.95 英镑。",
+      "keyWords": [
+        "affordable",
+        "pounds",
+        "guided"
+      ]
+    },
+    {
+      "index": 22,
+      "startMs": 350500,
+      "endMs": 365000,
+      "textEn": "And what is the policy regarding teacher and parent chaperone fees?",
+      "textZh": "那么对于带队老师和家长志愿者的收费政策是怎样的呢？",
+      "keyWords": [
+        "policy",
+        "chaperone"
+      ]
+    },
+    {
+      "index": 23,
+      "startMs": 365500,
+      "endMs": 385000,
+      "textEn": "Accompanying adults, such as group leaders and teachers, are completely free of charge.",
+      "textZh": "随行的成年人，如带队组长和老师，完全免费。",
+      "keyWords": [
+        "accompanying",
+        "leaders",
+        "teachers",
+        "charge"
+      ]
+    },
+    {
+      "index": 24,
+      "startMs": 385500,
+      "endMs": 472000,
+      "textEn": "That is the end of Section 1. You now have half a minute to check your answers.",
+      "textZh": "第一部分到此结束。你现在有半分钟时间检查你的答案。",
+      "keyWords": [
+        "Section",
+        "minute",
+        "check",
+        "answers"
+      ]
+    }
+  ]
+}

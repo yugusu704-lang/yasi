@@ -36,13 +36,17 @@ class ListeningTestInfo {
 
   factory ListeningTestInfo.fromJson(Map<String, dynamic> json) {
     return ListeningTestInfo(
-      testId: json['testId'] as String? ?? '',
-      book: json['book'] as String? ?? '',
-      testNumber: json['testNumber'] as int? ?? 1,
-      section: json['section'] as int? ?? 1,
-      title: json['title'] as String? ?? '',
-      audioUrl: json['audioUrl'] as String? ?? '',
-      localAudioPath: json['localAudioPath'] as String? ?? '',
+      testId: json['testId']?.toString() ?? '',
+      book: json['book']?.toString() ?? '',
+      testNumber: (json['testNumber'] ?? json['testNum']) is int
+          ? (json['testNumber'] ?? json['testNum']) as int
+          : int.tryParse((json['testNumber'] ?? json['testNum'])?.toString() ?? '1') ?? 1,
+      section: (json['section'] ?? json['sectionNum']) is int
+          ? (json['section'] ?? json['sectionNum']) as int
+          : int.tryParse((json['section'] ?? json['sectionNum'])?.toString() ?? '1') ?? 1,
+      title: json['title']?.toString() ?? '',
+      audioUrl: json['audioUrl']?.toString() ?? '',
+      localAudioPath: json['localAudioPath']?.toString() ?? '',
       totalDurationMs: json['totalDurationMs'] as int? ?? 0,
       sentences: (json['sentences'] as List<dynamic>?)
               ?.map((e) => SubtitleSentence.fromJson(e as Map<String, dynamic>))

@@ -637,15 +637,16 @@ class AppDatabase {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
 
-      // 仅在伴随句子存在时重写字幕
+      // 仅在伴随句子存在时重写字幕 (使用 Batch 极速批处理提交)
       if (test.sentences.isNotEmpty) {
         await txn.delete(
           'sentence_subtitles',
           where: 'test_id = ?',
           whereArgs: [test.testId],
         );
+        final sentenceBatch = txn.batch();
         for (final s in test.sentences) {
-          await txn.insert('sentence_subtitles', {
+          sentenceBatch.insert('sentence_subtitles', {
             'test_id': test.testId,
             'sentence_index': s.index,
             'start_ms': s.startMs,
@@ -655,17 +656,19 @@ class AppDatabase {
             'key_words': s.keyWords.join(','),
           });
         }
+        await sentenceBatch.commit(noResult: true);
       }
 
-      // 仅在伴随题目存在时重写题目
+      // 仅在伴随题目存在时重写题目 (使用 Batch 极速批处理提交)
       if (test.questions.isNotEmpty) {
         await txn.delete(
           'exam_questions',
           where: 'test_id = ?',
           whereArgs: [test.testId],
         );
+        final questionBatch = txn.batch();
         for (final q in test.questions) {
-          await txn.insert('exam_questions', {
+          questionBatch.insert('exam_questions', {
             'test_id': test.testId,
             'question_number': q.questionNumber,
             'prompt_before': q.promptBefore,
@@ -674,6 +677,7 @@ class AppDatabase {
             'target_sentence_index': q.targetSentenceIndex,
           });
         }
+        await questionBatch.commit(noResult: true);
       }
     });
   }
