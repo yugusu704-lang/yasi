@@ -34,7 +34,7 @@
   ],
   "rolling_state": {
     "git_branch": "main",
-    "latest_commit": "17466b3",
+    "latest_commit": "a75e23f",
     "github_repo": "https://github.com/yugusu704-lang/yasi.git",
     "release_tag": "v1.3.0",
     "flutter_version": "3.47.2",
