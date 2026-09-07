@@ -406,6 +406,11 @@ final googleDriveProvider =
 final cloudSyncServiceProvider = Provider<CloudSyncService>((ref) {
   final db = ref.watch(databaseProvider);
   final service = CloudSyncService(db: db);
+  service.onBeforeFileReplace = () {
+    try {
+      ref.read(audioPlayerServiceProvider).stop();
+    } catch (_) {}
+  };
   ref.onDispose(() => service.dispose());
   return service;
 });

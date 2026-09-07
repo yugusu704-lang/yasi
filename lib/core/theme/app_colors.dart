@@ -12,6 +12,7 @@ class AppColors {
   // 雅思学术红与英伦藏青
   static const Color ieltsCrimson = Color(0xFF9E2A2B);
   static const Color ieltsCrimsonLight = Color(0xFFC04B4C);
+  static const Color ieltsAmber = Color(0xFFF77F00);
   static const Color oxfordNavy = Color(0xFF1D2D44);
   static const Color slateBlue = Color(0xFF3E5C76);
 

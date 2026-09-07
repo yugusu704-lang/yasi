@@ -103,5 +103,21 @@ void main() {
       final syncService = CloudSyncService();
       expect(syncService.getProgress('non_existent_test'), 0.0);
     });
+
+    test('defaultManifestUrls prioritizes fast CDN mirrors', () {
+      expect(CloudSyncService.defaultManifestUrls.first,
+          contains('cdn.jsdelivr.net'));
+      expect(CloudSyncService.defaultManifestUrls.length, greaterThanOrEqualTo(3));
+    });
+
+    test('onBeforeFileReplace callback can be assigned and invoked', () {
+      final syncService = CloudSyncService();
+      bool called = false;
+      syncService.onBeforeFileReplace = () {
+        called = true;
+      };
+      syncService.onBeforeFileReplace?.call();
+      expect(called, isTrue);
+    });
   });
 }

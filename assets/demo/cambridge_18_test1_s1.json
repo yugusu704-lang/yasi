@@ -125,5 +125,99 @@
         "interns"
       ]
     }
+  ],
+  "questions": [
+    {
+      "questionNumber": 1,
+      "promptBefore": "Customer Full Name: Luisa ",
+      "promptAfter": "",
+      "acceptableAnswers": [
+        "Gould"
+      ],
+      "targetSentenceIndex": 3
+    },
+    {
+      "questionNumber": 2,
+      "promptBefore": "Occupation: ",
+      "promptAfter": " (environmental)",
+      "acceptableAnswers": [
+        "consultant"
+      ],
+      "targetSentenceIndex": 3
+    },
+    {
+      "questionNumber": 3,
+      "promptBefore": "Journey Purpose: mainly for ",
+      "promptAfter": "",
+      "acceptableAnswers": [
+        "commuting"
+      ],
+      "targetSentenceIndex": 5
+    },
+    {
+      "questionNumber": 4,
+      "promptBefore": "Frequency: travels ",
+      "promptAfter": " days a week by train",
+      "acceptableAnswers": [
+        "5",
+        "five"
+      ],
+      "targetSentenceIndex": 5
+    },
+    {
+      "questionNumber": 5,
+      "promptBefore": "Peak service: satisfied with the ",
+      "promptAfter": "",
+      "acceptableAnswers": [
+        "punctuality"
+      ],
+      "targetSentenceIndex": 7
+    },
+    {
+      "questionNumber": 6,
+      "promptBefore": "Train conditions: carriages are often ",
+      "promptAfter": "",
+      "acceptableAnswers": [
+        "overcrowded"
+      ],
+      "targetSentenceIndex": 7
+    },
+    {
+      "questionNumber": 7,
+      "promptBefore": "Crowding worst between 8 and ",
+      "promptAfter": " AM",
+      "acceptableAnswers": [
+        "9",
+        "nine"
+      ],
+      "targetSentenceIndex": 7
+    },
+    {
+      "questionNumber": 8,
+      "promptBefore": "Ticket type: monthly ",
+      "promptAfter": " ticket",
+      "acceptableAnswers": [
+        "season"
+      ],
+      "targetSentenceIndex": 8
+    },
+    {
+      "questionNumber": 9,
+      "promptBefore": "Fares have risen ",
+      "promptAfter": " this year",
+      "acceptableAnswers": [
+        "significantly"
+      ],
+      "targetSentenceIndex": 9
+    },
+    {
+      "questionNumber": 10,
+      "promptBefore": "Cost is hardest on ",
+      "promptAfter": " and interns",
+      "acceptableAnswers": [
+        "students"
+      ],
+      "targetSentenceIndex": 9
+    }
   ]
 }

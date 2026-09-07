@@ -314,6 +314,30 @@ class ListeningHomeScreen extends ConsumerWidget {
       BuildContext context, WidgetRef ref, ListeningTestInfo test) {
     final progressVal = ref.watch(singleTestProgressProvider(test.testId));
     final isDownloadingThisTest = progressVal > 0.0 && progressVal < 1.0;
+    final bool isIncomplete = test.isDownloaded &&
+        (test.questions.isEmpty || test.sentences.isEmpty);
+
+    String statusText = '云端待拉取';
+    IconData statusIcon = Icons.cloud_outlined;
+    Color statusColor = AppColors.textMuted;
+    Color badgeBg = Colors.transparent;
+
+    if (isDownloadingThisTest) {
+      statusText = '下载中';
+      statusIcon = Icons.downloading_rounded;
+      statusColor = AppColors.ieltsCrimson;
+      badgeBg = AppColors.ieltsCrimson.withValues(alpha: 0.08);
+    } else if (isIncomplete) {
+      statusText = '题库待补全';
+      statusIcon = Icons.sync_problem_rounded;
+      statusColor = AppColors.ieltsAmber;
+      badgeBg = AppColors.ieltsAmber.withValues(alpha: 0.1);
+    } else if (test.isDownloaded) {
+      statusText = '离线就绪';
+      statusIcon = Icons.offline_pin_rounded;
+      statusColor = AppColors.fsrsGood;
+      badgeBg = AppColors.paperSurface;
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -365,44 +389,30 @@ class ListeningHomeScreen extends ConsumerWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: test.isDownloaded
-                          ? AppColors.paperSurface
-                          : Colors.transparent,
+                      color: badgeBg,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: test.isDownloaded
-                            ? AppColors.borderLight
-                            : AppColors.textMuted,
+                        color: isIncomplete
+                            ? AppColors.ieltsAmber.withValues(alpha: 0.4)
+                            : (test.isDownloaded
+                                ? AppColors.borderLight
+                                : AppColors.textMuted),
                       ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          test.isDownloaded
-                              ? Icons.offline_pin_rounded
-                              : (isDownloadingThisTest
-                                  ? Icons.downloading_rounded
-                                  : Icons.cloud_outlined),
+                          statusIcon,
                           size: 13,
-                          color: test.isDownloaded
-                              ? AppColors.fsrsGood
-                              : (isDownloadingThisTest
-                                  ? AppColors.ieltsCrimson
-                                  : AppColors.textMuted),
+                          color: statusColor,
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          test.isDownloaded
-                              ? '离线就绪'
-                              : (isDownloadingThisTest ? '下载中' : '云端待拉取'),
+                          statusText,
                           style: TextStyle(
                             fontSize: 10,
-                            color: test.isDownloaded
-                                ? AppColors.fsrsGood
-                                : (isDownloadingThisTest
-                                    ? AppColors.ieltsCrimson
-                                    : AppColors.textMuted),
+                            color: statusColor,
                           ),
                         ),
                       ],
@@ -568,6 +578,88 @@ class ListeningHomeScreen extends ConsumerWidget {
                   ),
                 ),
               ] else ...[
+                if (isIncomplete) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.ieltsAmber.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: AppColors.ieltsAmber.withValues(alpha: 0.25)),
+                    ),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.info_outline,
+                            size: 14, color: AppColors.ieltsAmber),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '当前试卷缺少模考题库，建议立即补全以解锁1:1真题模考与精听',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.ieltsAmber,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.ieltsCrimson,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                      ),
+                      onPressed: () async {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('正在升级补全【${test.title}】题库...'),
+                            duration: const Duration(seconds: 1),
+                          ),
+                        );
+                        final success = await ref
+                            .read(cloudSyncServiceProvider)
+                            .downloadTestById(test.testId);
+                        if (success) {
+                          ref.invalidate(listeningTestsProvider);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('【${test.title}】已成功升级官方全功能题库！'),
+                                backgroundColor: AppColors.fsrsGood,
+                              ),
+                            );
+                          }
+                        } else {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('升级题库失败，请检查网络或稍后重试'),
+                                backgroundColor: AppColors.ieltsCrimson,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.upgrade_rounded, size: 16),
+                      label: const Text(
+                        '一键升级官方模考与题库',
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 Row(
                   children: [
                     if (test.questions.isNotEmpty) ...[
