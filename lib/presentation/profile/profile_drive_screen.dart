@@ -14,6 +14,27 @@ class ProfileDriveScreen extends ConsumerWidget {
     final driveNotifier = ref.read(googleDriveProvider.notifier);
     final overallStatsAsync = ref.watch(overallPrepStatsProvider);
 
+    ref.listen<GoogleDriveState>(googleDriveProvider, (previous, next) {
+      if (next.errorMessage != null &&
+          next.errorMessage != previous?.errorMessage) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.ieltsCrimson,
+            content: Text(next.errorMessage!),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      } else if (next.statusMessage != null &&
+          next.statusMessage != previous?.statusMessage) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.statusMessage!),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    });
+
     return Scaffold(
       backgroundColor: AppColors.paperBackground,
       appBar: AppBar(
@@ -101,29 +122,112 @@ class ProfileDriveScreen extends ConsumerWidget {
                       const SizedBox(height: 2),
                       Text(
                         driveState.isConnected
-                            ? '已绑定: ${driveState.accountEmail}'
+                            ? (driveState.displayName.isNotEmpty
+                                ? '${driveState.displayName} (${driveState.accountEmail})'
+                                : '已绑定: ${driveState.accountEmail}')
                             : '未授权连接个人谷歌云盘',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: driveState.isConnected
+                              ? AppColors.textPrimary
+                              : AppColors.textSecondary,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
                 Switch(
-                  value: driveState.isConnected,
+                  value: driveState.isConnected && driveState.autoSyncEnabled,
                   activeThumbColor: AppColors.ieltsCrimson,
                   onChanged: (val) {
-                    if (val) {
-                      driveNotifier.connectGoogleDrive();
-                    } else {
-                      driveNotifier.disconnect();
-                    }
+                    driveNotifier.toggleAutoSync(val);
                   },
                 ),
               ],
             ),
+            if (driveState.isConnected) ...[
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '上次同步: ${driveState.lastSyncTime}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      visualDensity: VisualDensity.compact,
+                      foregroundColor: AppColors.textSecondary,
+                    ),
+                    icon: const Icon(Icons.link_off_rounded, size: 14),
+                    label: const Text('解除绑定', style: TextStyle(fontSize: 12)),
+                    onPressed: () {
+                      _showUnbindConfirmDialog(context, driveNotifier);
+                    },
+                  ),
+                ],
+              ),
+            ],
+            if (driveState.isSyncing) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.oxfordNavy,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      driveState.statusMessage ?? '正在处理云端任务...',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.oxfordNavy,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (driveState.errorMessage != null) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.ieltsCrimson.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: AppColors.ieltsCrimson.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded,
+                        color: AppColors.ieltsCrimson, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        driveState.errorMessage!,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.ieltsCrimson,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             const Divider(color: AppColors.borderLight, height: 1),
             const SizedBox(height: 16),
@@ -144,11 +248,6 @@ class ProfileDriveScreen extends ConsumerWidget {
                     onPressed: driveState.isConnected
                         ? () {
                             driveNotifier.syncNow();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('已从 Google Drive 增量更新剑雅真题资源！'),
-                              ),
-                            );
                           }
                         : null,
                   ),
@@ -167,12 +266,7 @@ class ProfileDriveScreen extends ConsumerWidget {
                     ),
                     onPressed: driveState.isConnected
                         ? () {
-                            driveNotifier.syncNow();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('学习笔记与 FSRS 记忆进度已安全归档至网盘！'),
-                              ),
-                            );
+                            driveNotifier.backupDataNow();
                           }
                         : null,
                   ),
@@ -181,6 +275,34 @@ class ProfileDriveScreen extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showUnbindConfirmDialog(
+      BuildContext context, GoogleDriveNotifier driveNotifier) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('解除 Google Drive 绑定'),
+        content: const Text('解除绑定后将清除本地登录授权凭证。本地已下载的音频和做题记录将完整保留，确定退出吗？'),
+        actions: [
+          TextButton(
+            child: const Text('取消'),
+            onPressed: () => Navigator.of(ctx).pop(),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.ieltsCrimson,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('确定解绑'),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              driveNotifier.disconnect();
+            },
+          ),
+        ],
       ),
     );
   }

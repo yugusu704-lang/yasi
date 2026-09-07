@@ -9,6 +9,8 @@ import '../../domain/fsrs/fsrs_algorithm.dart';
 import '../../domain/fsrs/fsrs_card.dart';
 import '../../data/remote/audio_cache_service.dart';
 import '../../data/remote/cloud_sync_service.dart';
+import '../../data/remote/google_drive_mobile_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   return AppDatabase.instance;
@@ -119,52 +121,192 @@ final currentActiveTestProvider =
     NotifierProvider<CurrentActiveTestNotifier, ListeningTestInfo?>(
         CurrentActiveTestNotifier.new);
 
+// 谷歌云盘移动端服务 Provider
+final googleDriveMobileServiceProvider =
+    Provider<GoogleDriveMobileService>((ref) {
+  return GoogleDriveMobileService();
+});
+
 // 谷歌云盘同步状态 Provider
 class GoogleDriveState {
   final bool isConnected;
   final String accountEmail;
+  final String displayName;
+  final String? photoUrl;
   final bool isSyncing;
   final String lastSyncTime;
+  final bool autoSyncEnabled;
+  final String? statusMessage;
+  final String? errorMessage;
 
   const GoogleDriveState({
     this.isConnected = false,
     this.accountEmail = '',
+    this.displayName = '',
+    this.photoUrl,
     this.isSyncing = false,
     this.lastSyncTime = '未同步',
+    this.autoSyncEnabled = false,
+    this.statusMessage,
+    this.errorMessage,
   });
 
   GoogleDriveState copyWith({
     bool? isConnected,
     String? accountEmail,
+    String? displayName,
+    String? photoUrl,
     bool? isSyncing,
     String? lastSyncTime,
+    bool? autoSyncEnabled,
+    String? statusMessage,
+    String? errorMessage,
   }) {
     return GoogleDriveState(
       isConnected: isConnected ?? this.isConnected,
       accountEmail: accountEmail ?? this.accountEmail,
+      displayName: displayName ?? this.displayName,
+      photoUrl: photoUrl ?? this.photoUrl,
       isSyncing: isSyncing ?? this.isSyncing,
       lastSyncTime: lastSyncTime ?? this.lastSyncTime,
+      autoSyncEnabled: autoSyncEnabled ?? this.autoSyncEnabled,
+      statusMessage: statusMessage,
+      errorMessage: errorMessage,
     );
   }
 }
 
 class GoogleDriveNotifier extends Notifier<GoogleDriveState> {
-  @override
-  GoogleDriveState build() => const GoogleDriveState();
+  late final GoogleDriveMobileService _mobileService;
 
-  Future<void> connectGoogleDrive() async {
-    state = state.copyWith(isSyncing: true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    state = state.copyWith(
-      isConnected: true,
-      accountEmail: 'ielts_candidate@gmail.com',
-      isSyncing: false,
-      lastSyncTime: '刚刚',
-    );
+  @override
+  GoogleDriveState build() {
+    _mobileService = ref.watch(googleDriveMobileServiceProvider);
+    _restoreSavedState();
+    return const GoogleDriveState();
   }
 
+  Future<void> _restoreSavedState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final autoSync =
+          prefs.getBool(GoogleDriveMobileService.prefAutoSyncKey) ?? false;
+      final account = await _mobileService.initialize();
+      if (account != null) {
+        state = state.copyWith(
+          isConnected: true,
+          accountEmail: account.email,
+          displayName: account.displayName ?? '',
+          photoUrl: account.photoUrl,
+          autoSyncEnabled: autoSync,
+        );
+      } else {
+        state = state.copyWith(autoSyncEnabled: autoSync);
+      }
+    } catch (_) {}
+  }
+
+  /// 切换云端自动同步状态 (护栏 5: 软断开，不销毁 Token)
+  Future<void> toggleAutoSync(bool enabled) async {
+    if (!state.isConnected && enabled) {
+      await connectGoogleDrive();
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(GoogleDriveMobileService.prefAutoSyncKey, enabled);
+    state = state.copyWith(autoSyncEnabled: enabled);
+  }
+
+  /// 唤起 Google 授权登录流程 (护栏 1: GMS 异常防护与拦截)
+  Future<void> connectGoogleDrive() async {
+    state = state.copyWith(
+      isSyncing: true,
+      statusMessage: '正在调起 Google 授权...',
+      errorMessage: null,
+    );
+    try {
+      final account = await _mobileService.authenticate();
+      if (account != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(GoogleDriveMobileService.prefAutoSyncKey, true);
+
+        state = state.copyWith(
+          isConnected: true,
+          accountEmail: account.email,
+          displayName: account.displayName ?? '',
+          photoUrl: account.photoUrl,
+          isSyncing: false,
+          autoSyncEnabled: true,
+          statusMessage: 'Google Drive 已成功连接',
+          lastSyncTime: '刚刚',
+        );
+
+        // 成功连接后自动验证云盘根目录并同步真题清单
+        await syncNow();
+      } else {
+        state = state.copyWith(isSyncing: false, statusMessage: null);
+      }
+    } catch (e) {
+      String errStr = e.toString();
+      if (errStr.contains('12500') || errStr.contains('SERVICE_MISSING')) {
+        errStr = '当前设备未安装或禁用了 Google Play 服务框架，请检查系统 GMS 设置。';
+      } else if (errStr.contains('SocketException') ||
+          errStr.contains('TimeoutException') ||
+          errStr.contains('NetworkImageLoadException')) {
+        errStr = '连接 Google 服务器超时，请确保已开启科学上网网络环境。';
+      } else if (errStr.contains('canceled') || errStr.contains('CANCELED')) {
+        errStr = '用户取消了授权。';
+      }
+      state = state.copyWith(
+        isSyncing: false,
+        statusMessage: null,
+        errorMessage: errStr,
+      );
+    }
+  }
+
+  /// 一键全量导出备考数据并执行原子双版本滚动备份 (护栏 3)
+  Future<bool> backupDataNow() async {
+    if (!state.isConnected) {
+      await connectGoogleDrive();
+      if (!state.isConnected) return false;
+    }
+
+    state = state.copyWith(
+      isSyncing: true,
+      statusMessage: '正在打包本地备考档案与生词...',
+      errorMessage: null,
+    );
+    try {
+      final db = ref.read(databaseProvider);
+      final backupData = await db.exportFullBackupData();
+
+      state = state.copyWith(statusMessage: '正在上传云端双版本滚动备份...');
+      final success = await _mobileService.uploadRollingBackup(backupData);
+
+      state = state.copyWith(
+        isSyncing: false,
+        statusMessage: success ? '备考档案已成功备份至 Google Drive！' : '备份失败',
+        lastSyncTime: '刚刚',
+      );
+      return success;
+    } catch (e) {
+      state = state.copyWith(
+        isSyncing: false,
+        statusMessage: null,
+        errorMessage: '备份失败: $e',
+      );
+      return false;
+    }
+  }
+
+  /// 增量拉取音频与试卷清单
   Future<void> syncNow() async {
-    state = state.copyWith(isSyncing: true);
+    state = state.copyWith(
+      isSyncing: true,
+      statusMessage: '正在同步真题清单与云端音频...',
+      errorMessage: null,
+    );
     try {
       final syncService = ref.read(cloudSyncServiceProvider);
       final manifest = await syncService.fetchManifest();
@@ -172,11 +314,30 @@ class GoogleDriveNotifier extends Notifier<GoogleDriveState> {
         await syncService.syncManifestToDatabase(manifest);
         ref.invalidate(listeningTestsProvider);
       }
-    } catch (_) {}
-    state = state.copyWith(isSyncing: false, lastSyncTime: '刚刚');
+
+      // 如果已授权，额外检索用户云盘专属目录下的自定义音频
+      if (state.isConnected) {
+        await _mobileService.listRemoteAudioAssets();
+      }
+
+      state = state.copyWith(
+        isSyncing: false,
+        statusMessage: '云端清单已同步最新状态',
+        lastSyncTime: '刚刚',
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isSyncing: false,
+        statusMessage: null,
+        errorMessage: '同步发生异常: $e',
+      );
+    }
   }
 
-  void disconnect() {
+  /// 彻底解除绑定并清除凭据 (护栏 5)
+  Future<void> disconnect() async {
+    state = state.copyWith(isSyncing: true);
+    await _mobileService.signOut();
     state = const GoogleDriveState();
   }
 }

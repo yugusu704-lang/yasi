@@ -634,4 +634,73 @@ class AppDatabase {
       localAudioPath: '',
     );
   }
+
+  /// 全量导出学习档案与做题记录（供 Google Drive 云端安全备份）
+  Future<Map<String, dynamic>> exportFullBackupData() async {
+    final db = await database;
+    final vocab = await db.query('vocabulary');
+    final fsrs = await db.query('fsrs_cards');
+    final logs = await db.query('study_daily_logs');
+    final tests = await db.query('listening_tests');
+    return {
+      'version': 1,
+      'exportedAt': DateTime.now().toUtc().toIso8601String(),
+      'vocabulary': vocab,
+      'fsrs_cards': fsrs,
+      'study_daily_logs': logs,
+      'listening_tests': tests,
+    };
+  }
+
+  /// 从云端备份字典中原子恢复备考数据
+  Future<void> restoreFullBackupData(Map<String, dynamic> backupData) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // 1. 恢复生词表
+      final vocabList = backupData['vocabulary'] as List<dynamic>? ?? [];
+      for (final item in vocabList) {
+        if (item is Map<String, dynamic>) {
+          await txn.insert('vocabulary', item,
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+      }
+
+      // 2. 恢复 FSRS 记忆卡
+      final fsrsList = backupData['fsrs_cards'] as List<dynamic>? ?? [];
+      for (final item in fsrsList) {
+        if (item is Map<String, dynamic>) {
+          await txn.insert('fsrs_cards', item,
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+      }
+
+      // 3. 恢复每日学习时序打卡流水
+      final logsList = backupData['study_daily_logs'] as List<dynamic>? ?? [];
+      for (final item in logsList) {
+        if (item is Map<String, dynamic>) {
+          await txn.insert('study_daily_logs', item,
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+      }
+
+      // 4. 恢复真题做题次数与完成率 (保留本地下载状态)
+      final testsList = backupData['listening_tests'] as List<dynamic>? ?? [];
+      for (final item in testsList) {
+        if (item is Map<String, dynamic>) {
+          final testId = item['test_id'] as String?;
+          if (testId != null) {
+            await txn.update(
+              'listening_tests',
+              {
+                'play_count': item['play_count'] ?? 0,
+                'completion_rate': item['completion_rate'] ?? 0.0,
+              },
+              where: 'test_id = ?',
+              whereArgs: [testId],
+            );
+          }
+        }
+      }
+    });
+  }
 }
