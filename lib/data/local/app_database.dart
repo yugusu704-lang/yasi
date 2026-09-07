@@ -467,55 +467,61 @@ class AppDatabase {
   }
 
   // --- 听力真题与字幕 ---
-  Future<List<ListeningTestInfo>> getAllTests() async {
+  /// 获取所有试卷（支持 lightweight 模式：仅加载试卷元数据，不加载全量字幕与考题，极大降低内存占用）
+  Future<List<ListeningTestInfo>> getAllTests({bool lightweight = false}) async {
     final db = await database;
     final testMaps = await db.query('listening_tests');
     final tests = <ListeningTestInfo>[];
 
     for (final m in testMaps) {
       final testId = m['test_id'] as String;
-      final subMaps = await db.query(
-        'sentence_subtitles',
-        where: 'test_id = ?',
-        whereArgs: [testId],
-        orderBy: 'sentence_index ASC',
-      );
+      List<SubtitleSentence> sentences = const [];
+      List<ExamQuestion> questions = const [];
 
-      final sentences = subMaps.map((s) {
-        final kw = (s['key_words'] as String? ?? '')
-            .split(',')
-            .where((w) => w.isNotEmpty)
-            .toList();
-        return SubtitleSentence(
-          index: s['sentence_index'] as int,
-          startMs: s['start_ms'] as int,
-          endMs: s['end_ms'] as int,
-          textEn: s['text_en'] as String,
-          textZh: s['text_zh'] as String,
-          keyWords: kw,
+      if (!lightweight) {
+        final subMaps = await db.query(
+          'sentence_subtitles',
+          where: 'test_id = ?',
+          whereArgs: [testId],
+          orderBy: 'sentence_index ASC',
         );
-      }).toList();
 
-      final qMaps = await db.query(
-        'exam_questions',
-        where: 'test_id = ?',
-        whereArgs: [testId],
-        orderBy: 'question_number ASC',
-      );
+        sentences = subMaps.map((s) {
+          final kw = (s['key_words'] as String? ?? '')
+              .split(',')
+              .where((w) => w.isNotEmpty)
+              .toList();
+          return SubtitleSentence(
+            index: s['sentence_index'] as int,
+            startMs: s['start_ms'] as int,
+            endMs: s['end_ms'] as int,
+            textEn: s['text_en'] as String,
+            textZh: s['text_zh'] as String,
+            keyWords: kw,
+          );
+        }).toList();
 
-      final questions = qMaps.map((q) {
-        final answers = (q['acceptable_answers'] as String? ?? '')
-            .split('|||')
-            .where((a) => a.isNotEmpty)
-            .toList();
-        return ExamQuestion(
-          questionNumber: q['question_number'] as int,
-          promptBefore: q['prompt_before'] as String? ?? '',
-          promptAfter: q['prompt_after'] as String? ?? '',
-          acceptableAnswers: answers,
-          targetSentenceIndex: q['target_sentence_index'] as int? ?? 0,
+        final qMaps = await db.query(
+          'exam_questions',
+          where: 'test_id = ?',
+          whereArgs: [testId],
+          orderBy: 'question_number ASC',
         );
-      }).toList();
+
+        questions = qMaps.map((q) {
+          final answers = (q['acceptable_answers'] as String? ?? '')
+              .split('|||')
+              .where((a) => a.isNotEmpty)
+              .toList();
+          return ExamQuestion(
+            questionNumber: q['question_number'] as int,
+            promptBefore: q['prompt_before'] as String? ?? '',
+            promptAfter: q['prompt_after'] as String? ?? '',
+            acceptableAnswers: answers,
+            targetSentenceIndex: q['target_sentence_index'] as int? ?? 0,
+          );
+        }).toList();
+      }
 
       tests.add(ListeningTestInfo(
         testId: testId,
@@ -537,12 +543,76 @@ class AppDatabase {
     return tests;
   }
 
+  /// O(1) 靶向单题查询：直接根据 test_id 检索，根除 N+1 查询雪崩
   Future<ListeningTestInfo?> getTestById(String testId) async {
-    final tests = await getAllTests();
-    for (final t in tests) {
-      if (t.testId == testId) return t;
-    }
-    return null;
+    final db = await database;
+    final testMaps = await db.query(
+      'listening_tests',
+      where: 'test_id = ?',
+      whereArgs: [testId],
+      limit: 1,
+    );
+    if (testMaps.isEmpty) return null;
+
+    final m = testMaps.first;
+    final subMaps = await db.query(
+      'sentence_subtitles',
+      where: 'test_id = ?',
+      whereArgs: [testId],
+      orderBy: 'sentence_index ASC',
+    );
+
+    final sentences = subMaps.map((s) {
+      final kw = (s['key_words'] as String? ?? '')
+          .split(',')
+          .where((w) => w.isNotEmpty)
+          .toList();
+      return SubtitleSentence(
+        index: s['sentence_index'] as int,
+        startMs: s['start_ms'] as int,
+        endMs: s['end_ms'] as int,
+        textEn: s['text_en'] as String,
+        textZh: s['text_zh'] as String,
+        keyWords: kw,
+      );
+    }).toList();
+
+    final qMaps = await db.query(
+      'exam_questions',
+      where: 'test_id = ?',
+      whereArgs: [testId],
+      orderBy: 'question_number ASC',
+    );
+
+    final questions = qMaps.map((q) {
+      final answers = (q['acceptable_answers'] as String? ?? '')
+          .split('|||')
+          .where((a) => a.isNotEmpty)
+          .toList();
+      return ExamQuestion(
+        questionNumber: q['question_number'] as int,
+        promptBefore: q['prompt_before'] as String? ?? '',
+        promptAfter: q['prompt_after'] as String? ?? '',
+        acceptableAnswers: answers,
+        targetSentenceIndex: q['target_sentence_index'] as int? ?? 0,
+      );
+    }).toList();
+
+    return ListeningTestInfo(
+      testId: testId,
+      book: m['book'] as String,
+      testNumber: m['test_number'] as int,
+      section: m['section'] as int,
+      title: m['title'] as String,
+      audioUrl: m['audio_url'] as String,
+      localAudioPath: m['local_audio_path'] as String,
+      totalDurationMs: m['total_duration_ms'] as int,
+      isDownloaded: (m['is_downloaded'] as int) == 1,
+      playCount: m['play_count'] as int,
+      completionRate: (m['completion_rate'] as num).toDouble(),
+      sentences: sentences,
+      questions: questions,
+    );
   }
 
   /// 原子化插入或更新整套真题及其句子字幕与模考题目 (ACID 事务)

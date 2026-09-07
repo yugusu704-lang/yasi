@@ -109,6 +109,62 @@ final listeningTestsProvider =
   return await db.getAllTests();
 });
 
+/// 当前选中的书籍筛选标签 (例如 '全部', '剑19', '剑18', ...)
+class SelectedBookFilterNotifier extends Notifier<String> {
+  @override
+  String build() => '全部';
+
+  void setFilter(String filter) => state = filter;
+}
+
+final selectedBookFilterProvider =
+    NotifierProvider<SelectedBookFilterNotifier, String>(
+        SelectedBookFilterNotifier.new);
+
+/// 动态提取真题库中所有已收录的书籍列表，按编号降序排布
+final availableBooksProvider = Provider<List<String>>((ref) {
+  final testsAsync = ref.watch(listeningTestsProvider);
+  final tests = testsAsync.value ?? [];
+  final bookSet = <String>{};
+  for (final t in tests) {
+    if (t.book.isNotEmpty) {
+      bookSet.add(t.book);
+    }
+  }
+
+  final sortedBooks = bookSet.toList()
+    ..sort((a, b) {
+      final numA =
+          int.tryParse(RegExp(r'\d+').firstMatch(a)?.group(0) ?? '') ?? 0;
+      final numB =
+          int.tryParse(RegExp(r'\d+').firstMatch(b)?.group(0) ?? '') ?? 0;
+      return numB.compareTo(numA);
+    });
+
+  return ['全部', ...sortedBooks];
+});
+
+/// 根据书籍筛选标签过滤后的真题列表
+final filteredListeningTestsProvider =
+    FutureProvider<List<ListeningTestInfo>>((ref) async {
+  final tests = await ref.watch(listeningTestsProvider.future);
+  final filter = ref.watch(selectedBookFilterProvider);
+
+  if (filter == '全部') {
+    return tests;
+  }
+
+  final filterNum = RegExp(r'\d+').firstMatch(filter)?.group(0);
+  if (filterNum != null) {
+    return tests.where((t) {
+      final tNum = RegExp(r'\d+').firstMatch(t.book)?.group(0);
+      return tNum == filterNum || t.testId.startsWith('c${filterNum}_');
+    }).toList();
+  }
+
+  return tests.where((t) => t.book == filter).toList();
+});
+
 // 当前正在练习的真题
 class CurrentActiveTestNotifier extends Notifier<ListeningTestInfo?> {
   @override
@@ -365,6 +421,20 @@ final syncProgressStreamProvider =
     StreamProvider<CloudSyncProgress>((ref) {
   final syncService = ref.watch(cloudSyncServiceProvider);
   return syncService.progressStream;
+});
+
+// 单题独立进度监听 Provider
+final singleTestProgressProvider =
+    Provider.family<double, String>((ref, testId) {
+  final currentProgress = ref.watch(syncProgressStreamProvider).value;
+  if (currentProgress != null &&
+      currentProgress.testId == testId &&
+      !currentProgress.isCompleted &&
+      currentProgress.error == null) {
+    return currentProgress.progress;
+  }
+  final syncService = ref.watch(cloudSyncServiceProvider);
+  return syncService.getProgress(testId);
 });
 
 // 学习统计数据 Providers

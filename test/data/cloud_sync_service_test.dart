@@ -98,5 +98,10 @@ void main() {
       // Should safely return null instead of crashing on invalid JSON
       expect(manifest, isNull);
     });
+
+    test('getProgress returns 0.0 for idle test and tracks progress', () {
+      final syncService = CloudSyncService();
+      expect(syncService.getProgress('non_existent_test'), 0.0);
+    });
   });
 }

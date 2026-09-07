@@ -13,8 +13,10 @@ class ListeningHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final testsAsync = ref.watch(listeningTestsProvider);
+    final testsAsync = ref.watch(filteredListeningTestsProvider);
     final statsAsync = ref.watch(todayListeningStatsProvider);
+    final selectedBook = ref.watch(selectedBookFilterProvider);
+    final availableBooks = ref.watch(availableBooksProvider);
 
     return Scaffold(
       backgroundColor: AppColors.paperBackground,
@@ -34,7 +36,7 @@ class ListeningHomeScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.cloud_download_outlined,
                 color: AppColors.oxfordNavy),
-            tooltip: '从云盘同步试卷清单',
+            tooltip: '从云端同步试卷清单',
             onPressed: () async {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -45,12 +47,14 @@ class ListeningHomeScreen extends ConsumerWidget {
               final syncService = ref.read(cloudSyncServiceProvider);
               final manifest = await syncService.fetchManifest();
               if (manifest != null) {
-                final added = await syncService.syncManifestToDatabase(manifest);
+                final added =
+                    await syncService.syncManifestToDatabase(manifest);
                 ref.invalidate(listeningTestsProvider);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('云盘同步就绪！收录 ${manifest.tests.length} 套试卷 (新增 $added 套)'),
+                      content: Text(
+                          '云端同步就绪！收录 ${manifest.tests.length} 套试卷 (新增 $added 套)'),
                       backgroundColor: AppColors.oxfordNavy,
                     ),
                   );
@@ -59,7 +63,7 @@ class ListeningHomeScreen extends ConsumerWidget {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('无法连接云端清单，请检查网络或网盘授权'),
+                      content: Text('无法连接云端清单，请检查网络或稍后重试'),
                       backgroundColor: AppColors.ieltsCrimson,
                     ),
                   );
@@ -69,31 +73,155 @@ class ListeningHomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: testsAsync.when(
-        data: (tests) => ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          children: [
-            // 今日精听战报看板
-            _buildListeningStatsBanner(statsAsync),
-            const SizedBox(height: 20),
+      body: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 今日精听战报看板
+                  _buildListeningStatsBanner(statsAsync),
+                  const SizedBox(height: 16),
 
-            const Text(
-              '真题精听库',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                  // 剑雅书籍横向快速筛选 Chips
+                  _buildBookFilterChips(
+                      context, ref, availableBooks, selectedBook),
+                  const SizedBox(height: 16),
+
+                  // 列表标题与计数
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            '真题精听库',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color:
+                                  AppColors.oxfordNavy.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              selectedBook == '全部' ? '全套真题' : selectedBook,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.oxfordNavy,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      testsAsync.maybeWhen(
+                        data: (tests) => Text(
+                          '共 ${tests.length} 套试卷',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                        orElse: () => const SizedBox.shrink(),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
+          ),
+          testsAsync.when(
+            data: (tests) {
+              if (tests.isEmpty) {
+                return const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Text(
+                      '暂无当前分类试卷，请点击右上角同步清单',
+                      style:
+                          TextStyle(fontSize: 13, color: AppColors.textMuted),
+                    ),
+                  ),
+                );
+              }
+              return SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverList.builder(
+                  itemCount: tests.length,
+                  itemBuilder: (context, index) {
+                    return _buildTestCard(context, ref, tests[index]);
+                  },
+                ),
+              );
+            },
+            loading: () => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child:
+                    CircularProgressIndicator(color: AppColors.ieltsCrimson),
+              ),
+            ),
+            error: (err, _) => SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: Text('加载真题失败: $err')),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ],
+      ),
+    );
+  }
 
-            for (final test in tests) _buildTestCard(context, ref, test),
-          ],
-        ),
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.ieltsCrimson),
-        ),
-        error: (err, _) => Center(child: Text('加载真题失败: $err')),
+  Widget _buildBookFilterChips(BuildContext context, WidgetRef ref,
+      List<String> books, String selectedBook) {
+    if (books.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: books.length,
+        separatorBuilder: (_, index) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final book = books[index];
+          final isSelected = book == selectedBook;
+          final displayText = book == '全部'
+              ? '全部'
+              : (book.startsWith('Cambridge ')
+                  ? '剑${book.replaceFirst('Cambridge ', '')}'
+                  : book);
+
+          return ChoiceChip(
+            label: Text(displayText),
+            selected: isSelected,
+            selectedColor: AppColors.oxfordNavy,
+            backgroundColor: AppColors.cardSurface,
+            labelStyle: TextStyle(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              color: isSelected ? Colors.white : AppColors.textSecondary,
+            ),
+            side: BorderSide(
+              color: isSelected ? AppColors.oxfordNavy : AppColors.borderLight,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            showCheckmark: false,
+            onSelected: (_) {
+              ref.read(selectedBookFilterProvider.notifier).setFilter(book);
+            },
+          );
+        },
       ),
     );
   }
@@ -184,14 +312,8 @@ class ListeningHomeScreen extends ConsumerWidget {
 
   Widget _buildTestCard(
       BuildContext context, WidgetRef ref, ListeningTestInfo test) {
-    final syncProgressAsync = ref.watch(syncProgressStreamProvider);
-    final currentProgress = syncProgressAsync.value;
-    final isDownloadingThisTest = currentProgress?.testId == test.testId &&
-        currentProgress?.isCompleted != true &&
-        currentProgress?.error == null;
-    final progressVal = (currentProgress?.testId == test.testId)
-        ? (currentProgress?.progress ?? 0.0)
-        : 0.0;
+    final progressVal = ref.watch(singleTestProgressProvider(test.testId));
+    final isDownloadingThisTest = progressVal > 0.0 && progressVal < 1.0;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),

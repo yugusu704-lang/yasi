@@ -39,10 +39,24 @@ class CloudSyncService {
   })  : _client = client ?? http.Client(),
         _db = db ?? AppDatabase.instance;
 
+  final Map<String, double> _progressMap = {};
+
   Stream<CloudSyncProgress> get progressStream => _progressController.stream;
   bool isDownloading(String testId) => _activeDownloads.contains(testId);
+  double getProgress(String testId) => _progressMap[testId] ?? 0.0;
 
-  /// 获取云端试卷总清单 (支持公开直链与自定义 Google Drive 镜像)
+  void _updateProgress(String testId, double progress,
+      {bool isCompleted = false, String? error}) {
+    _progressMap[testId] = progress;
+    _progressController.add(CloudSyncProgress(
+      testId: testId,
+      progress: progress,
+      isCompleted: isCompleted,
+      error: error,
+    ));
+  }
+
+  /// 获取云端试卷总清单 (支持公开直链与自定义镜像)
   Future<CloudManifest?> fetchManifest({String? customUrl}) async {
     final url = customUrl ?? defaultManifestUrl;
     try {
@@ -52,7 +66,8 @@ class CloudSyncService {
 
       if (response.statusCode == 200 &&
           !response.body.trim().startsWith('<')) {
-        final Map<String, dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+        final Map<String, dynamic> data =
+            jsonDecode(utf8.decode(response.bodyBytes));
         return CloudManifest.fromJson(data);
       }
     } catch (e) {
@@ -101,7 +116,8 @@ class CloudSyncService {
     if (localTest != null) {
       final fallbackEntry = ManifestTestEntry(
         testId: localTest.testId,
-        book: int.tryParse(localTest.book.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+        book:
+            int.tryParse(localTest.book.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
         testNum: localTest.testNumber,
         sectionNum: localTest.section,
         title: localTest.title,
@@ -113,15 +129,16 @@ class CloudSyncService {
     return false;
   }
 
-  /// 按需即时下载指定试卷音频与伴随题目（原子暂存 + 事务入库）
+  /// 按需即时下载指定试卷音频与伴随题目（原子暂存 + 校验 + 事务入库 + 失败回滚）
   Future<bool> downloadTest(ManifestTestEntry entry) async {
     final testId = entry.testId;
     if (_activeDownloads.contains(testId)) return false;
 
     _activeDownloads.add(testId);
-    _progressController.add(CloudSyncProgress(testId: testId, progress: 0.05));
+    _updateProgress(testId, 0.05);
 
     File? tempAudioFile;
+    File? finalAudioFile;
     try {
       final docDir = await getApplicationDocumentsDirectory();
       final testsDir = Directory('${docDir.path}/local_tests');
@@ -130,66 +147,99 @@ class CloudSyncService {
       }
 
       final relativeAudioPath = 'local_tests/$testId.mp3';
-      final finalAudioFile = File('${docDir.path}/$relativeAudioPath');
+      finalAudioFile = File('${docDir.path}/$relativeAudioPath');
       tempAudioFile = File('${docDir.path}/$relativeAudioPath.tmp');
 
       // 1. 拉取伴随 JSON 数据 (含毫秒级字幕与题目)
-      _progressController.add(CloudSyncProgress(testId: testId, progress: 0.15));
+      _updateProgress(testId, 0.15);
       ListeningTestInfo? parsedTest;
       if (entry.companionJsonUrl.isNotEmpty) {
         final jsonRes = await _client
             .get(Uri.parse(entry.companionJsonUrl))
             .timeout(const Duration(seconds: 12));
         if (jsonRes.statusCode == 200 && !jsonRes.body.trim().startsWith('<')) {
-          final jsonMap = jsonDecode(utf8.decode(jsonRes.bodyBytes)) as Map<String, dynamic>;
+          final jsonMap =
+              jsonDecode(utf8.decode(jsonRes.bodyBytes)) as Map<String, dynamic>;
           parsedTest = ListeningTestInfo.fromJson(jsonMap);
         }
       }
 
-      // 2. 流式下载 MP3 音频 (多源回退与防 Google Drive 病毒扫描拦截页)
-      _progressController.add(CloudSyncProgress(testId: testId, progress: 0.3));
+      // 2. 流式下载 MP3 音频 (多源回退 + 5s 握手超时 + Magic Bytes 防御)
+      _updateProgress(testId, 0.25);
       bool audioDownloaded = false;
 
       for (final audioUrl in entry.audioUrls) {
         if (audioUrl.isEmpty) continue;
+        IOSink? sink;
         try {
           final request = http.Request('GET', Uri.parse(audioUrl));
-          final streamedResponse = await _client.send(request).timeout(const Duration(seconds: 20));
+          final streamedResponse =
+              await _client.send(request).timeout(const Duration(seconds: 15));
 
           if (streamedResponse.statusCode == 200) {
-            final contentLength = streamedResponse.contentLength ?? entry.audioSize;
+            final contentLength =
+                streamedResponse.contentLength ?? entry.audioSize;
             int receivedBytes = 0;
-            final sink = tempAudioFile.openWrite();
 
-            await for (final chunk in streamedResponse.stream) {
-              sink.add(chunk);
-              receivedBytes += chunk.length;
-              if (contentLength > 0) {
-                final currentProgress = 0.3 + (receivedBytes / contentLength) * 0.6;
-                _progressController.add(CloudSyncProgress(
-                  testId: testId,
-                  progress: currentProgress.clamp(0.3, 0.9),
-                ));
+            try {
+              sink = tempAudioFile.openWrite();
+              await for (final chunk in streamedResponse.stream) {
+                sink.add(chunk);
+                receivedBytes += chunk.length;
+                if (contentLength > 0) {
+                  final currentProgress =
+                      0.25 + (receivedBytes / contentLength) * 0.65;
+                  _updateProgress(
+                      testId, currentProgress.clamp(0.25, 0.9));
+                }
+              }
+            } finally {
+              // 护栏 4: IOSink 确保无论异常与否 100% 释放文件句柄
+              if (sink != null) {
+                await sink.flush();
+                await sink.close();
+                sink = null;
               }
             }
-            await sink.flush();
-            await sink.close();
 
-            // 防御拦截：校验是否误下载了 Google Drive 病毒拦截 HTML
+            // 护栏 2: 严密二进制魔数 (Magic Bytes) 校验与非音频流拦截
             final fileLen = await tempAudioFile.length();
-            if (fileLen > 1000) {
-              final headerBytes = await tempAudioFile.openRead(0, 50).first;
-              final headerStr = String.fromCharCodes(headerBytes).toLowerCase();
-              if (!headerStr.contains('<!doctype') && !headerStr.contains('<html')) {
+            if (fileLen > 10000) {
+              final headerBytes = await tempAudioFile.openRead(0, 64).first;
+              final headerStr =
+                  String.fromCharCodes(headerBytes).toLowerCase();
+
+              final isHtmlOrJson = headerStr.contains('<!doctype') ||
+                  headerStr.contains('<html') ||
+                  headerStr.contains('{"error"');
+
+              final hasId3 = headerBytes.length >= 3 &&
+                  headerBytes[0] == 0x49 &&
+                  headerBytes[1] == 0x44 &&
+                  headerBytes[2] == 0x33;
+              final hasMpegSync = headerBytes.length >= 2 &&
+                  headerBytes[0] == 0xFF &&
+                  (headerBytes[1] & 0xE0) == 0xE0;
+
+              if (!isHtmlOrJson &&
+                  (hasId3 ||
+                      hasMpegSync ||
+                      streamedResponse.headers['content-type']
+                              ?.contains('audio') ==
+                          true)) {
                 audioDownloaded = true;
                 break;
               }
             }
-            // 若为错误拦截页则删除临时文件并尝试下一个备用源
             if (await tempAudioFile.exists()) await tempAudioFile.delete();
           }
         } catch (e) {
           debugPrint('[CloudSyncService] 尝试音频源 $audioUrl 失败: $e');
+          if (sink != null) {
+            try {
+              await sink.close();
+            } catch (_) {}
+          }
           if (await tempAudioFile.exists()) await tempAudioFile.delete();
         }
       }
@@ -202,13 +252,17 @@ class CloudSyncService {
       if (await finalAudioFile.exists()) await finalAudioFile.delete();
       await tempAudioFile.rename(finalAudioFile.path);
 
-      // 4. 数据库事务原子化更新
+      // 4. 数据库事务原子化更新 (护栏 4: 双仓联动回滚)
       final completeTest = ListeningTestInfo(
         testId: testId,
-        book: parsedTest?.book.isNotEmpty == true ? parsedTest!.book : 'Cambridge ${entry.book}',
+        book: parsedTest?.book.isNotEmpty == true
+            ? parsedTest!.book
+            : 'Cambridge ${entry.book}',
         testNumber: parsedTest?.testNumber ?? entry.testNum,
         section: parsedTest?.section ?? entry.sectionNum,
-        title: parsedTest?.title.isNotEmpty == true ? parsedTest!.title : entry.title,
+        title: parsedTest?.title.isNotEmpty == true
+            ? parsedTest!.title
+            : entry.title,
         audioUrl: entry.preferredAudioUrl,
         localAudioPath: relativeAudioPath,
         totalDurationMs: parsedTest?.totalDurationMs ?? 0,
@@ -219,13 +273,17 @@ class CloudSyncService {
         completionRate: 0.0,
       );
 
-      await _db.insertOrUpdateTest(completeTest);
+      try {
+        await _db.insertOrUpdateTest(completeTest);
+      } catch (dbError) {
+        // 数据库写入失败时回滚物理文件，杜绝孤儿文件
+        if (await finalAudioFile.exists()) {
+          await finalAudioFile.delete();
+        }
+        rethrow;
+      }
 
-      _progressController.add(CloudSyncProgress(
-        testId: testId,
-        progress: 1.0,
-        isCompleted: true,
-      ));
+      _updateProgress(testId, 1.0, isCompleted: true);
       return true;
     } catch (e) {
       debugPrint('[CloudSyncService] 试卷 $testId 下载异常: $e');
@@ -234,11 +292,7 @@ class CloudSyncService {
           await tempAudioFile.delete();
         } catch (_) {}
       }
-      _progressController.add(CloudSyncProgress(
-        testId: testId,
-        progress: 0.0,
-        error: e.toString(),
-      ));
+      _updateProgress(testId, 0.0, error: e.toString());
       return false;
     } finally {
       _activeDownloads.remove(testId);
