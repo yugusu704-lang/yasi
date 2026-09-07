@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/listening_test_info.dart';
 
 class AudioPlayerService {
@@ -43,11 +45,24 @@ class AudioPlayerService {
     _sentenceIndexController.add(0);
 
     try {
-      // 优先从本地 assets 离线加载
       if (test.localAudioPath.isNotEmpty) {
         try {
-          await _player.setAsset(test.localAudioPath);
-          return;
+          if (test.localAudioPath.startsWith('assets/')) {
+            await _player.setAsset(test.localAudioPath);
+            return;
+          } else {
+            // 沙盒路径解析：支持绝对路径或基于 Documents 目录的相对路径
+            String resolvedPath = test.localAudioPath;
+            final f = File(resolvedPath);
+            if (!await f.exists()) {
+              final docDir = await getApplicationDocumentsDirectory();
+              resolvedPath = '${docDir.path}/$resolvedPath';
+            }
+            if (await File(resolvedPath).exists()) {
+              await _player.setFilePath(resolvedPath);
+              return;
+            }
+          }
         } catch (_) {
           // 本地资产加载失败时降级尝试网络源
         }

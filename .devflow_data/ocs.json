@@ -21,17 +21,20 @@
     "【已完成】v1.1.0 全局音频会话互斥调度（精听与词汇例句防重叠暂停）",
     "【已完成】v1.1.0 生词本 RenderFlex 溢出黄黑条带根治与自适应排版",
     "【已完成】v1.1.0 SQLite 学习事件时序流水仓与今日精听/备考档案全动态数据看板绑定",
-    "【待推进】v1.2.0 架构加固：补全 AppDatabase exam_questions 关联表",
+    "【已完成】v1.2.0 SQLite AppDatabase 升级至 v3，全面补齐 exam_questions 关联表与 ACID 事务操作",
+    "【已完成】v1.2.0 雅思听力抓取与 Google Drive 转存流水线脚本 (scripts/drive_ingest_pipeline.py)",
+    "【已完成】v1.2.0 客户端 CloudSyncService：多源 Manifest 校验、防 Google 拦截、原子流式暂存与本地离线入库",
+    "【已完成】v1.2.0 剑雅精听题库按需即时下载、下载实时进度条与本地磁盘空间释放",
     "【待推进】v1.2.0 架构加固：SentenceDiffMatcher 短词长度自适应编辑距离",
-    "【待推进】剑雅 4-19 题库内容资产化解耦 (JSON)"
+    "【待推进】剑雅 4-19 题库内容资产化解耦与批量同步"
   ],
   "rolling_state": {
     "git_branch": "main",
-    "latest_commit": "19143c2",
+    "latest_commit": "65336d1",
     "github_repo": "https://github.com/yugusu704-lang/yasi.git",
     "release_tag": "v1.1.0",
     "flutter_version": "3.47.2",
-    "test_coverage": "20/20 tests passing (100%)",
+    "test_coverage": "24/24 tests passing (100%)",
     "analyzer_status": "0 issues (clean)",
     "target_device": "Xiaomi 14 (HyperOS, Android 16)"
   },

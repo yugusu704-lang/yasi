@@ -48,10 +48,56 @@ class ListeningTestInfo {
               ?.map((e) => SubtitleSentence.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      questions: const [],
+      questions: (json['questions'] as List<dynamic>?)
+              ?.map((e) {
+                final m = e as Map<String, dynamic>;
+                final ansRaw = m['acceptableAnswers'] ?? m['acceptable_answers'];
+                final List<String> ans = [];
+                if (ansRaw is List) {
+                  for (final a in ansRaw) {
+                    if (a != null) ans.add(a.toString());
+                  }
+                }
+                return ExamQuestion(
+                  questionNumber: m['questionNumber'] ?? m['question_number'] ?? 1,
+                  promptBefore: m['promptBefore'] ?? m['prompt_before'] ?? '',
+                  promptAfter: m['promptAfter'] ?? m['prompt_after'] ?? '',
+                  acceptableAnswers: ans,
+                  targetSentenceIndex: m['targetSentenceIndex'] ?? m['target_sentence_index'] ?? 0,
+                  userAnswer: m['userAnswer'] ?? m['user_answer'] ?? '',
+                );
+              })
+              .toList() ??
+          const [],
       isDownloaded: json['isDownloaded'] as bool? ?? true,
       playCount: json['playCount'] as int? ?? 0,
       completionRate: (json['completionRate'] as num?)?.toDouble() ?? 0.0,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'testId': testId,
+      'book': book,
+      'testNumber': testNumber,
+      'section': section,
+      'title': title,
+      'audioUrl': audioUrl,
+      'localAudioPath': localAudioPath,
+      'totalDurationMs': totalDurationMs,
+      'sentences': sentences.map((s) => s.toJson()).toList(),
+      'questions': questions
+          .map((q) => {
+                'questionNumber': q.questionNumber,
+                'promptBefore': q.promptBefore,
+                'promptAfter': q.promptAfter,
+                'acceptableAnswers': q.acceptableAnswers,
+                'targetSentenceIndex': q.targetSentenceIndex,
+              })
+          .toList(),
+      'isDownloaded': isDownloaded,
+      'playCount': playCount,
+      'completionRate': completionRate,
+    };
   }
 }

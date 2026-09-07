@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart';
 import '../../domain/models/word_item.dart';
 import '../../domain/models/listening_test_info.dart';
 import '../../domain/models/subtitle_sentence.dart';
+import '../../domain/models/exam_question.dart';
 import '../../domain/models/study_stats.dart';
 import '../../domain/fsrs/fsrs_card.dart';
 import 'default_data.dart';
@@ -26,7 +27,7 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onOpen: (db) async {
         await _createTablesIfNotExist(db);
       },
@@ -36,6 +37,28 @@ class AppDatabase {
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         await _createTablesIfNotExist(db);
+        if (oldVersion < 3) {
+          // 升级到 v3：填充初始试卷的 1:1 模考真实问题
+          for (final test in DefaultData.initialTests) {
+            final count = Sqflite.firstIntValue(await db.rawQuery(
+                'SELECT COUNT(*) FROM exam_questions WHERE test_id = ?',
+                [test.testId])) ?? 0;
+            if (count == 0 && test.questions.isNotEmpty) {
+              final b = db.batch();
+              for (final q in test.questions) {
+                b.insert('exam_questions', {
+                  'test_id': test.testId,
+                  'question_number': q.questionNumber,
+                  'prompt_before': q.promptBefore,
+                  'prompt_after': q.promptAfter,
+                  'acceptable_answers': q.acceptableAnswers.join('|||'),
+                  'target_sentence_index': q.targetSentenceIndex,
+                });
+              }
+              await b.commit(noResult: true);
+            }
+          }
+        }
       },
     );
   }
@@ -111,6 +134,18 @@ class AppDatabase {
         updated_at TEXT
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS exam_questions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        test_id TEXT NOT NULL,
+        question_number INTEGER NOT NULL,
+        prompt_before TEXT,
+        prompt_after TEXT,
+        acceptable_answers TEXT NOT NULL,
+        target_sentence_index INTEGER
+      )
+    ''');
   }
 
   Future<void> _seedInitialData(Database db) async {
@@ -140,6 +175,17 @@ class AppDatabase {
           'text_en': s.textEn,
           'text_zh': s.textZh,
           'key_words': s.keyWords.join(','),
+        });
+      }
+
+      for (final q in test.questions) {
+        batch.insert('exam_questions', {
+          'test_id': test.testId,
+          'question_number': q.questionNumber,
+          'prompt_before': q.promptBefore,
+          'prompt_after': q.promptAfter,
+          'acceptable_answers': q.acceptableAnswers.join('|||'),
+          'target_sentence_index': q.targetSentenceIndex,
         });
       }
     }
@@ -450,6 +496,27 @@ class AppDatabase {
         );
       }).toList();
 
+      final qMaps = await db.query(
+        'exam_questions',
+        where: 'test_id = ?',
+        whereArgs: [testId],
+        orderBy: 'question_number ASC',
+      );
+
+      final questions = qMaps.map((q) {
+        final answers = (q['acceptable_answers'] as String? ?? '')
+            .split('|||')
+            .where((a) => a.isNotEmpty)
+            .toList();
+        return ExamQuestion(
+          questionNumber: q['question_number'] as int,
+          promptBefore: q['prompt_before'] as String? ?? '',
+          promptAfter: q['prompt_after'] as String? ?? '',
+          acceptableAnswers: answers,
+          targetSentenceIndex: q['target_sentence_index'] as int? ?? 0,
+        );
+      }).toList();
+
       tests.add(ListeningTestInfo(
         testId: testId,
         book: m['book'] as String,
@@ -463,9 +530,108 @@ class AppDatabase {
         playCount: m['play_count'] as int,
         completionRate: (m['completion_rate'] as num).toDouble(),
         sentences: sentences,
+        questions: questions,
       ));
     }
 
     return tests;
+  }
+
+  Future<ListeningTestInfo?> getTestById(String testId) async {
+    final tests = await getAllTests();
+    for (final t in tests) {
+      if (t.testId == testId) return t;
+    }
+    return null;
+  }
+
+  /// 原子化插入或更新整套真题及其句子字幕与模考题目 (ACID 事务)
+  Future<void> insertOrUpdateTest(ListeningTestInfo test) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.insert(
+        'listening_tests',
+        {
+          'test_id': test.testId,
+          'book': test.book,
+          'test_number': test.testNumber,
+          'section': test.section,
+          'title': test.title,
+          'audio_url': test.audioUrl,
+          'local_audio_path': test.localAudioPath,
+          'total_duration_ms': test.totalDurationMs,
+          'is_downloaded': test.isDownloaded ? 1 : 0,
+          'play_count': test.playCount,
+          'completion_rate': test.completionRate,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      // 仅在伴随句子存在时重写字幕
+      if (test.sentences.isNotEmpty) {
+        await txn.delete(
+          'sentence_subtitles',
+          where: 'test_id = ?',
+          whereArgs: [test.testId],
+        );
+        for (final s in test.sentences) {
+          await txn.insert('sentence_subtitles', {
+            'test_id': test.testId,
+            'sentence_index': s.index,
+            'start_ms': s.startMs,
+            'end_ms': s.endMs,
+            'text_en': s.textEn,
+            'text_zh': s.textZh,
+            'key_words': s.keyWords.join(','),
+          });
+        }
+      }
+
+      // 仅在伴随题目存在时重写题目
+      if (test.questions.isNotEmpty) {
+        await txn.delete(
+          'exam_questions',
+          where: 'test_id = ?',
+          whereArgs: [test.testId],
+        );
+        for (final q in test.questions) {
+          await txn.insert('exam_questions', {
+            'test_id': test.testId,
+            'question_number': q.questionNumber,
+            'prompt_before': q.promptBefore,
+            'prompt_after': q.promptAfter,
+            'acceptable_answers': q.acceptableAnswers.join('|||'),
+            'target_sentence_index': q.targetSentenceIndex,
+          });
+        }
+      }
+    });
+  }
+
+  /// 更新真题的离线下载状态与物理音频相对路径
+  Future<void> updateTestDownloadStatus(
+    String testId, {
+    required bool isDownloaded,
+    required String localAudioPath,
+  }) async {
+    final db = await database;
+    await db.update(
+      'listening_tests',
+      {
+        'is_downloaded': isDownloaded ? 1 : 0,
+        'local_audio_path': localAudioPath,
+      },
+      where: 'test_id = ?',
+      whereArgs: [testId],
+    );
+  }
+
+  /// 释放本地磁盘空间：标记真题为未下载并清空本地音频路径
+  Future<void> deleteTestAudio(String testId) async {
+    await updateTestDownloadStatus(
+      testId,
+      isDownloaded: false,
+      localAudioPath: '',
+    );
   }
 }

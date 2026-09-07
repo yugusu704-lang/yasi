@@ -3,10 +3,12 @@ import '../../data/local/app_database.dart';
 import '../../domain/models/word_item.dart';
 import '../../domain/models/listening_test_info.dart';
 import '../../domain/models/study_stats.dart';
+import '../../domain/models/cloud_manifest.dart';
 import '../../domain/audio/audio_player_service.dart';
 import '../../domain/fsrs/fsrs_algorithm.dart';
 import '../../domain/fsrs/fsrs_card.dart';
 import '../../data/remote/audio_cache_service.dart';
+import '../../data/remote/cloud_sync_service.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   return AppDatabase.instance;
@@ -162,9 +164,15 @@ class GoogleDriveNotifier extends Notifier<GoogleDriveState> {
   }
 
   Future<void> syncNow() async {
-    if (!state.isConnected) return;
     state = state.copyWith(isSyncing: true);
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final syncService = ref.read(cloudSyncServiceProvider);
+      final manifest = await syncService.fetchManifest();
+      if (manifest != null) {
+        await syncService.syncManifestToDatabase(manifest);
+        ref.invalidate(listeningTestsProvider);
+      }
+    } catch (_) {}
     state = state.copyWith(isSyncing: false, lastSyncTime: '刚刚');
   }
 
@@ -176,6 +184,27 @@ class GoogleDriveNotifier extends Notifier<GoogleDriveState> {
 final googleDriveProvider =
     NotifierProvider<GoogleDriveNotifier, GoogleDriveState>(
         GoogleDriveNotifier.new);
+
+// 云端题库同步服务 Provider
+final cloudSyncServiceProvider = Provider<CloudSyncService>((ref) {
+  final db = ref.watch(databaseProvider);
+  final service = CloudSyncService(db: db);
+  ref.onDispose(() => service.dispose());
+  return service;
+});
+
+// 云端清单 Provider
+final cloudManifestProvider = FutureProvider<CloudManifest?>((ref) async {
+  final syncService = ref.watch(cloudSyncServiceProvider);
+  return await syncService.fetchManifest();
+});
+
+// 单题下载进度流 Provider
+final syncProgressStreamProvider =
+    StreamProvider<CloudSyncProgress>((ref) {
+  final syncService = ref.watch(cloudSyncServiceProvider);
+  return syncService.progressStream;
+});
 
 // 学习统计数据 Providers
 final todayListeningStatsProvider =

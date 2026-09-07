@@ -34,14 +34,37 @@ class ListeningHomeScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.cloud_download_outlined,
                 color: AppColors.oxfordNavy),
-            tooltip: '从云盘增量拉取音频',
-            onPressed: () {
+            tooltip: '从云盘同步试卷清单',
+            onPressed: () async {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('正在检测 Google Drive 听力真题资源更新...'),
+                  content: Text('正在从云端检测剑雅听力真题清单更新...'),
                   duration: Duration(seconds: 2),
                 ),
               );
+              final syncService = ref.read(cloudSyncServiceProvider);
+              final manifest = await syncService.fetchManifest();
+              if (manifest != null) {
+                final added = await syncService.syncManifestToDatabase(manifest);
+                ref.invalidate(listeningTestsProvider);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('云盘同步就绪！收录 ${manifest.tests.length} 套试卷 (新增 $added 套)'),
+                      backgroundColor: AppColors.oxfordNavy,
+                    ),
+                  );
+                }
+              } else {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('无法连接云端清单，请检查网络或网盘授权'),
+                      backgroundColor: AppColors.ieltsCrimson,
+                    ),
+                  );
+                }
+              }
             },
           ),
         ],
@@ -64,7 +87,7 @@ class ListeningHomeScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
 
-            for (final test in tests) _buildTestCard(context, test),
+            for (final test in tests) _buildTestCard(context, ref, test),
           ],
         ),
         loading: () => const Center(
@@ -159,18 +182,30 @@ class ListeningHomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTestCard(BuildContext context, ListeningTestInfo test) {
+  Widget _buildTestCard(
+      BuildContext context, WidgetRef ref, ListeningTestInfo test) {
+    final syncProgressAsync = ref.watch(syncProgressStreamProvider);
+    final currentProgress = syncProgressAsync.value;
+    final isDownloadingThisTest = currentProgress?.testId == test.testId &&
+        currentProgress?.isCompleted != true &&
+        currentProgress?.error == null;
+    final progressVal = (currentProgress?.testId == test.testId)
+        ? (currentProgress?.progress ?? 0.0)
+        : 0.0;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: MiuixCard(
         cornerRadius: 16,
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (ctx) => ListeningWorkbenchScreen(test: test),
-            ),
-          );
-        },
+        onPressed: test.isDownloaded
+            ? () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (ctx) => ListeningWorkbenchScreen(test: test),
+                  ),
+                );
+              }
+            : null,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -224,25 +259,56 @@ class ListeningHomeScreen extends ConsumerWidget {
                         Icon(
                           test.isDownloaded
                               ? Icons.offline_pin_rounded
-                              : Icons.cloud_outlined,
+                              : (isDownloadingThisTest
+                                  ? Icons.downloading_rounded
+                                  : Icons.cloud_outlined),
                           size: 13,
                           color: test.isDownloaded
                               ? AppColors.fsrsGood
-                              : AppColors.textMuted,
+                              : (isDownloadingThisTest
+                                  ? AppColors.ieltsCrimson
+                                  : AppColors.textMuted),
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          test.isDownloaded ? '离线就绪' : '云端待拉取',
+                          test.isDownloaded
+                              ? '离线就绪'
+                              : (isDownloadingThisTest ? '下载中' : '云端待拉取'),
                           style: TextStyle(
                             fontSize: 10,
                             color: test.isDownloaded
                                 ? AppColors.fsrsGood
-                                : AppColors.textMuted,
+                                : (isDownloadingThisTest
+                                    ? AppColors.ieltsCrimson
+                                    : AppColors.textMuted),
                           ),
                         ),
                       ],
                     ),
                   ),
+                  if (test.isDownloaded &&
+                      !test.localAudioPath.startsWith('assets/')) ...[
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded,
+                          size: 16, color: AppColors.textMuted),
+                      tooltip: '释放本地磁盘空间',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () async {
+                        await ref
+                            .read(cloudSyncServiceProvider)
+                            .deleteTestAudio(test.testId);
+                        ref.invalidate(listeningTestsProvider);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('已释放试卷音频本地空间，备考学习记录依然保留'),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 10),
@@ -261,7 +327,9 @@ class ListeningHomeScreen extends ConsumerWidget {
                       size: 14, color: AppColors.textMuted),
                   const SizedBox(width: 4),
                   Text(
-                    '${test.sentences.length} 句逐句精听',
+                    test.sentences.isNotEmpty
+                        ? '${test.sentences.length} 句逐句精听'
+                        : '云端高清音频',
                     style: const TextStyle(
                         fontSize: 12, color: AppColors.textSecondary),
                   ),
@@ -270,7 +338,9 @@ class ListeningHomeScreen extends ConsumerWidget {
                       size: 14, color: AppColors.textMuted),
                   const SizedBox(width: 4),
                   Text(
-                    '${(test.totalDurationMs / 1000).round()} 秒音频',
+                    test.totalDurationMs > 0
+                        ? '${(test.totalDurationMs / 1000).round()} 秒音频'
+                        : '完整 Section 考段',
                     style: const TextStyle(
                         fontSize: 12, color: AppColors.textSecondary),
                   ),
@@ -289,37 +359,124 @@ class ListeningHomeScreen extends ConsumerWidget {
                   ],
                 ],
               ),
-              if (test.questions.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                Row(
+              const SizedBox(height: 14),
+              if (isDownloadingThisTest) ...[
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.ieltsCrimson,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          elevation: 0,
-                        ),
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (ctx) => ExamModeScreen(test: test),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.edit_note_rounded, size: 16),
-                        label: const Text(
-                          '1:1 官方真题模考',
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          '正在从云端拉取音频与题目...',
                           style: TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.bold),
+                              fontSize: 11, color: AppColors.textSecondary),
                         ),
+                        Text(
+                          '${(progressVal * 100).toInt()}%',
+                          style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.ieltsCrimson),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: progressVal > 0 ? progressVal : null,
+                        color: AppColors.ieltsCrimson,
+                        backgroundColor: AppColors.borderLight,
+                        minHeight: 6,
                       ),
                     ),
-                    const SizedBox(width: 10),
+                  ],
+                ),
+              ] else if (!test.isDownloaded) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.oxfordNavy,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: () async {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('开始拉取 ${test.title}...'),
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
+                      final success = await ref
+                          .read(cloudSyncServiceProvider)
+                          .downloadTestById(test.testId);
+                      if (success) {
+                        ref.invalidate(listeningTestsProvider);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('【${test.title}】已下载完毕，可完全离线练习！'),
+                              backgroundColor: AppColors.fsrsGood,
+                            ),
+                          );
+                        }
+                      } else {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('下载失败，请检查网络或稍后重试'),
+                              backgroundColor: AppColors.ieltsCrimson,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.cloud_download_rounded, size: 16),
+                    label: const Text(
+                      '拉取云端音频与试卷',
+                      style:
+                          TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                Row(
+                  children: [
+                    if (test.questions.isNotEmpty) ...[
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.ieltsCrimson,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (ctx) => ExamModeScreen(test: test),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.edit_note_rounded, size: 16),
+                          label: const Text(
+                            '1:1 官方真题模考',
+                            style: TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
                     Expanded(
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
