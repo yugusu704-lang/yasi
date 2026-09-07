@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ielts_prep/domain/models/cloud_manifest.dart';
 
@@ -72,6 +73,22 @@ void main() {
       expect(entry.formattedSize, '0 MB');
       expect(entry.sha256, isNull);
       expect(entry.preferredAudioUrl, 'https://example.com/audio.mp3');
+    });
+
+    test('assets/cloud_manifest.json contains high-fidelity official audio entries for C18 and C19', () {
+      final manifestFile = File('assets/cloud_manifest.json');
+      expect(manifestFile.existsSync(), isTrue);
+
+      final manifestData = jsonDecode(manifestFile.readAsStringSync()) as Map<String, dynamic>;
+      final manifest = CloudManifest.fromJson(manifestData);
+
+      final c18 = manifest.tests.firstWhere((t) => t.testId == 'c18_t1_s1');
+      expect(c18.audioSize, equals(6900820));
+      expect(c18.audioUrls.isNotEmpty, isTrue);
+
+      final c19 = manifest.tests.firstWhere((t) => t.testId == 'c19_t1_s1');
+      expect(c19.audioSize, equals(7563057));
+      expect(c19.audioUrls.isNotEmpty, isTrue);
     });
   });
 }

@@ -79,6 +79,38 @@ class ListeningTestInfo {
     );
   }
 
+  ListeningTestInfo copyWith({
+    String? testId,
+    String? book,
+    int? testNumber,
+    int? section,
+    String? title,
+    String? audioUrl,
+    String? localAudioPath,
+    int? totalDurationMs,
+    List<SubtitleSentence>? sentences,
+    List<ExamQuestion>? questions,
+    bool? isDownloaded,
+    int? playCount,
+    double? completionRate,
+  }) {
+    return ListeningTestInfo(
+      testId: testId ?? this.testId,
+      book: book ?? this.book,
+      testNumber: testNumber ?? this.testNumber,
+      section: section ?? this.section,
+      title: title ?? this.title,
+      audioUrl: audioUrl ?? this.audioUrl,
+      localAudioPath: localAudioPath ?? this.localAudioPath,
+      totalDurationMs: totalDurationMs ?? this.totalDurationMs,
+      sentences: sentences ?? this.sentences,
+      questions: questions ?? this.questions,
+      isDownloaded: isDownloaded ?? this.isDownloaded,
+      playCount: playCount ?? this.playCount,
+      completionRate: completionRate ?? this.completionRate,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'testId': testId,

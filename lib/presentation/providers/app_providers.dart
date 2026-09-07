@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/local/app_database.dart';
+import '../../data/local/default_data.dart';
 import '../../domain/models/word_item.dart';
 import '../../domain/models/listening_test_info.dart';
 import '../../domain/models/study_stats.dart';
@@ -106,7 +107,33 @@ final dueCardsProvider = FutureProvider<List<WordItem>>((ref) async {
 final listeningTestsProvider =
     FutureProvider<List<ListeningTestInfo>>((ref) async {
   final db = ref.watch(databaseProvider);
-  return await db.getAllTests();
+  var tests = await db.getAllTests();
+
+  // 自愈与内置真题自动校验 (Self-healing & Auto-seeding)
+  // 保证旧版本升级用户也能立刻无缝获得 C19 和官方全量 C18，无需手动清空数据库或手动点同步
+  final needsC19 = !tests.any((t) => t.testId == 'c19_t1_s1');
+  final needsC18Upgrade = tests.any(
+      (t) => t.testId == 'c18_t1_s1' && t.totalDurationMs < 100000);
+
+  if (tests.isEmpty || needsC19 || needsC18Upgrade) {
+    for (final initialTest in DefaultData.initialTests) {
+      final existing = tests
+          .cast<ListeningTestInfo?>()
+          .firstWhere((t) => t?.testId == initialTest.testId, orElse: () => null);
+
+      if (existing == null || existing.totalDurationMs < 100000) {
+        final updatedTest = initialTest.copyWith(
+          playCount: existing?.playCount ?? initialTest.playCount,
+          completionRate:
+              existing?.completionRate ?? initialTest.completionRate,
+        );
+        await db.insertOrUpdateTest(updatedTest);
+      }
+    }
+    tests = await db.getAllTests();
+  }
+
+  return tests;
 });
 
 /// 当前选中的书籍筛选标签 (例如 '全部', '剑19', '剑18', ...)

@@ -222,10 +222,14 @@ class CloudSyncService {
 
       // 若远端拉取失败或无题目，从本地预置数据安全兜底加载
       if (parsedTest == null || parsedTest.questions.isEmpty) {
-        if (testId == 'c18_t1_s1') {
+        final localAssetJsonPath = testId == 'c18_t1_s1'
+            ? 'assets/demo/cambridge_18_test1_s1.json'
+            : testId == 'c19_t1_s1'
+                ? 'assets/demo/cambridge_19_test1_s1.json'
+                : null;
+        if (localAssetJsonPath != null) {
           try {
-            final assetStr = await rootBundle
-                .loadString('assets/demo/cambridge_18_test1_s1.json');
+            final assetStr = await rootBundle.loadString(localAssetJsonPath);
             final jsonMap = jsonDecode(assetStr) as Map<String, dynamic>;
             parsedTest = ListeningTestInfo.fromJson(jsonMap);
           } catch (_) {}
@@ -339,6 +343,22 @@ class CloudSyncService {
           }
           if (await tempAudioFile.exists()) await tempAudioFile.delete();
         }
+      }
+
+      if (!audioDownloaded) {
+        // 本地内置官方母带音频安全兜底 (C18 / C19)
+        final assetAudioPath = 'assets/demo/$testId.mp3';
+        try {
+          final byteData = await rootBundle.load(assetAudioPath);
+          final bytes = byteData.buffer.asUint8List(
+            byteData.offsetInBytes,
+            byteData.lengthInBytes,
+          );
+          if (bytes.length > 100000) {
+            await tempAudioFile.writeAsBytes(bytes, flush: true);
+            audioDownloaded = true;
+          }
+        } catch (_) {}
       }
 
       if (!audioDownloaded) {

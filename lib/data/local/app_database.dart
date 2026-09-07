@@ -27,7 +27,7 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onOpen: (db) async {
         await _createTablesIfNotExist(db);
       },
@@ -56,6 +56,89 @@ class AppDatabase {
                 });
               }
               await b.commit(noResult: true);
+            }
+          }
+        }
+        if (oldVersion < 4) {
+          // 升级到 v4：确保注入 C19 并升级 C18 为官方全长母带音频与字幕
+          for (final test in DefaultData.initialTests) {
+            final existing = await db.query(
+              'listening_tests',
+              where: 'test_id = ?',
+              whereArgs: [test.testId],
+              limit: 1,
+            );
+            if (existing.isEmpty) {
+              await db.insert('listening_tests', {
+                'test_id': test.testId,
+                'book': test.book,
+                'test_number': test.testNumber,
+                'section': test.section,
+                'title': test.title,
+                'audio_url': test.audioUrl,
+                'local_audio_path': test.localAudioPath,
+                'total_duration_ms': test.totalDurationMs,
+                'is_downloaded': test.isDownloaded ? 1 : 0,
+                'play_count': test.playCount,
+                'completion_rate': test.completionRate,
+              });
+            } else {
+              final oldDuration =
+                  existing.first['total_duration_ms'] as int? ?? 0;
+              if (oldDuration < 100000) {
+                await db.update(
+                  'listening_tests',
+                  {
+                    'total_duration_ms': test.totalDurationMs,
+                    'audio_url': test.audioUrl,
+                    'local_audio_path': test.localAudioPath,
+                    'title': test.title,
+                  },
+                  where: 'test_id = ?',
+                  whereArgs: [test.testId],
+                );
+              }
+            }
+
+            if (test.sentences.isNotEmpty) {
+              await db.delete(
+                'sentence_subtitles',
+                where: 'test_id = ?',
+                whereArgs: [test.testId],
+              );
+              final sb = db.batch();
+              for (final s in test.sentences) {
+                sb.insert('sentence_subtitles', {
+                  'test_id': test.testId,
+                  'sentence_index': s.index,
+                  'start_ms': s.startMs,
+                  'end_ms': s.endMs,
+                  'text_en': s.textEn,
+                  'text_zh': s.textZh,
+                  'key_words': s.keyWords.join(','),
+                });
+              }
+              await sb.commit(noResult: true);
+            }
+
+            if (test.questions.isNotEmpty) {
+              await db.delete(
+                'exam_questions',
+                where: 'test_id = ?',
+                whereArgs: [test.testId],
+              );
+              final qb = db.batch();
+              for (final q in test.questions) {
+                qb.insert('exam_questions', {
+                  'test_id': test.testId,
+                  'question_number': q.questionNumber,
+                  'prompt_before': q.promptBefore,
+                  'prompt_after': q.promptAfter,
+                  'acceptable_answers': q.acceptableAnswers.join('|||'),
+                  'target_sentence_index': q.targetSentenceIndex,
+                });
+              }
+              await qb.commit(noResult: true);
             }
           }
         }

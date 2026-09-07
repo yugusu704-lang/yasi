@@ -315,7 +315,9 @@ class ListeningHomeScreen extends ConsumerWidget {
     final progressVal = ref.watch(singleTestProgressProvider(test.testId));
     final isDownloadingThisTest = progressVal > 0.0 && progressVal < 1.0;
     final bool isIncomplete = test.isDownloaded &&
-        (test.questions.isEmpty || test.sentences.isEmpty);
+        (test.questions.isEmpty ||
+            test.sentences.isEmpty ||
+            test.totalDurationMs < 100000);
 
     String statusText = '云端待拉取';
     IconData statusIcon = Icons.cloud_outlined;
@@ -590,14 +592,16 @@ class ListeningHomeScreen extends ConsumerWidget {
                           color: AppColors.ieltsAmber.withValues(alpha: 0.25)),
                     ),
                     child: Row(
-                      children: const [
-                        Icon(Icons.info_outline,
+                      children: [
+                        const Icon(Icons.info_outline,
                             size: 14, color: AppColors.ieltsAmber),
-                        SizedBox(width: 6),
+                        const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            '当前试卷缺少模考题库，建议立即补全以解锁1:1真题模考与精听',
-                            style: TextStyle(
+                            test.totalDurationMs < 100000
+                                ? '当前试卷为旧版缩略音频，建议立即升级为官方母带完整原声'
+                                : '当前试卷缺少模考题库，建议立即补全以解锁1:1真题模考与精听',
+                            style: const TextStyle(
                               fontSize: 11,
                               color: AppColors.ieltsAmber,
                               fontWeight: FontWeight.w500,
