@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_miuix/miuix.dart';
 import '../../core/theme/app_colors.dart';
 import '../../domain/models/listening_test_info.dart';
+import '../../domain/models/study_stats.dart';
 import '../providers/app_providers.dart';
 import 'listening_workbench_screen.dart';
 import 'exam_mode_screen.dart';
@@ -13,6 +14,7 @@ class ListeningHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final testsAsync = ref.watch(listeningTestsProvider);
+    final statsAsync = ref.watch(todayListeningStatsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.paperBackground,
@@ -49,7 +51,7 @@ class ListeningHomeScreen extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           children: [
             // 今日精听战报看板
-            _buildListeningStatsBanner(),
+            _buildListeningStatsBanner(statsAsync),
             const SizedBox(height: 20),
 
             const Text(
@@ -73,7 +75,7 @@ class ListeningHomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildListeningStatsBanner() {
+  Widget _buildListeningStatsBanner(AsyncValue<TodayListeningStats> statsAsync) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -88,15 +90,37 @@ class ListeningHomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildStatItem('今日精听', '28', '分钟'),
-          Container(width: 1, height: 36, color: AppColors.borderLight),
-          _buildStatItem('单句复读', '142', '次'),
-          Container(width: 1, height: 36, color: AppColors.borderLight),
-          _buildStatItem('已掌握句', '85%', '理解度'),
-        ],
+      child: statsAsync.when(
+        data: (stats) => Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildStatItem('今日精听', '${stats.listeningMinutes}', '分钟'),
+            Container(width: 1, height: 36, color: AppColors.borderLight),
+            _buildStatItem('单句复读', '${stats.repeatCount}', '次'),
+            Container(width: 1, height: 36, color: AppColors.borderLight),
+            _buildStatItem('已掌握句', stats.formattedMasteryRate, '理解度'),
+          ],
+        ),
+        loading: () => Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildStatItem('今日精听', '-', '分钟'),
+            Container(width: 1, height: 36, color: AppColors.borderLight),
+            _buildStatItem('单句复读', '-', '次'),
+            Container(width: 1, height: 36, color: AppColors.borderLight),
+            _buildStatItem('已掌握句', '-', '理解度'),
+          ],
+        ),
+        error: (err, stack) => Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildStatItem('今日精听', '0', '分钟'),
+            Container(width: 1, height: 36, color: AppColors.borderLight),
+            _buildStatItem('单句复读', '0', '次'),
+            Container(width: 1, height: 36, color: AppColors.borderLight),
+            _buildStatItem('已掌握句', '0%', '理解度'),
+          ],
+        ),
       ),
     );
   }

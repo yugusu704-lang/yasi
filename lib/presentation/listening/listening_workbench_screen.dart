@@ -524,7 +524,7 @@ class _ListeningWorkbenchScreenState
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                onPressed: () {
+                onPressed: () async {
                   final text = controller?.text ?? '';
                   final res = _diffMatcher.diff(
                     original: s.textEn,
@@ -533,6 +533,15 @@ class _ListeningWorkbenchScreenState
                   setState(() {
                     _dictationResults[index] = res;
                   });
+
+                  if (text.trim().isNotEmpty) {
+                    final isMastered = res.accuracy >= 0.8;
+                    await ref
+                        .read(databaseProvider)
+                        .recordSentenceMastery(isMastered: isMastered);
+                    ref.invalidate(todayListeningStatsProvider);
+                    ref.invalidate(overallPrepStatsProvider);
+                  }
                 },
                 icon: const Icon(Icons.spellcheck_rounded, size: 16),
                 label: const Text('即时对齐对比',

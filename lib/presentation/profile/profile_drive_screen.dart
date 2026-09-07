@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_miuix/miuix.dart';
 import '../../core/theme/app_colors.dart';
+import '../../domain/models/study_stats.dart';
 import '../providers/app_providers.dart';
 
 class ProfileDriveScreen extends ConsumerWidget {
@@ -11,6 +12,7 @@ class ProfileDriveScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final driveState = ref.watch(googleDriveProvider);
     final driveNotifier = ref.read(googleDriveProvider.notifier);
+    final overallStatsAsync = ref.watch(overallPrepStatsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.paperBackground,
@@ -44,7 +46,7 @@ class ProfileDriveScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _buildStatsCard(),
+          _buildStatsCard(overallStatsAsync),
           const SizedBox(height: 20),
 
           // 离线引擎与发音偏好设置
@@ -183,47 +185,123 @@ class ProfileDriveScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatsCard() {
+  Widget _buildStatsCard(AsyncValue<OverallPrepStats> overallStatsAsync) {
     return MiuixCard(
       cornerRadius: 18,
       child: Padding(
         padding: const EdgeInsets.all(18),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildStatMetric('累计精听', '18.5', '小时'),
-                _buildStatMetric('FSRS 掌握', '146', '词'),
-                _buildStatMetric('连续备考', '7', '天'),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.paperSurface,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Row(
+        child: overallStatsAsync.when(
+          data: (stats) => Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  Icon(Icons.insights_rounded,
-                      color: AppColors.fsrsGood, size: 20),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      '记忆预测：按当前 FSRS 频率复习，剑雅听力 Section 1/4 词汇准确率可保持在 92% 以上。',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textPrimary,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
+                  _buildStatMetric('累计精听', '${stats.totalListeningHours}', '小时'),
+                  _buildStatMetric('FSRS 掌握', '${stats.fsrsMasteredWords}', '词'),
+                  _buildStatMetric('连续备考', '${stats.streakDays}', '天'),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.paperSurface,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.insights_rounded,
+                        color: AppColors.fsrsGood, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        stats.retentionPrediction,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textPrimary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          loading: () => Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildStatMetric('累计精听', '-', '小时'),
+                  _buildStatMetric('FSRS 掌握', '-', '词'),
+                  _buildStatMetric('连续备考', '-', '天'),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.paperSurface,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.insights_rounded,
+                        color: AppColors.fsrsGood, size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '记忆预测计算中...',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          error: (err, stack) => Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildStatMetric('累计精听', '0.0', '小时'),
+                  _buildStatMetric('FSRS 掌握', '0', '词'),
+                  _buildStatMetric('连续备考', '0', '天'),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.paperSurface,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.insights_rounded,
+                        color: AppColors.fsrsGood, size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '开始听力和词汇练习后，此处将呈现个性化记忆留存预测。',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textPrimary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_miuix/miuix.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/models/word_item.dart';
+import '../../providers/app_providers.dart';
 
-class WordLookupBottomSheet extends StatefulWidget {
+class WordLookupBottomSheet extends ConsumerStatefulWidget {
   final String word;
   final String contextSentenceEn;
   final String contextSentenceZh;
@@ -21,26 +22,23 @@ class WordLookupBottomSheet extends StatefulWidget {
   });
 
   @override
-  State<WordLookupBottomSheet> createState() => _WordLookupBottomSheetState();
+  ConsumerState<WordLookupBottomSheet> createState() =>
+      _WordLookupBottomSheetState();
 }
 
-class _WordLookupBottomSheetState extends State<WordLookupBottomSheet> {
-  final FlutterTts _tts = FlutterTts();
+class _WordLookupBottomSheetState
+    extends ConsumerState<WordLookupBottomSheet> {
   bool _isAdded = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _initTts();
+  void _speak() {
+    ref.read(audioCacheServiceProvider).playWordUk(widget.word);
   }
 
-  Future<void> _initTts() async {
-    await _tts.setLanguage('en-GB');
-    await _tts.setSpeechRate(0.45);
-  }
-
-  Future<void> _speak() async {
-    await _tts.speak(widget.word);
+  void _speakSentence() {
+    ref.read(audioCacheServiceProvider).speakSentence(
+          widget.contextSentenceEn,
+          word: widget.word,
+        );
   }
 
   @override
@@ -141,13 +139,41 @@ class _WordLookupBottomSheetState extends State<WordLookupBottomSheet> {
 
           // 真题语境例句
           if (widget.contextSentenceEn.isNotEmpty) ...[
-            const Text(
-              '真题语境出处',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textMuted,
-              ),
+            Row(
+              children: [
+                const Text(
+                  '真题语境出处',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                const Spacer(),
+                InkWell(
+                  onTap: _speakSentence,
+                  borderRadius: BorderRadius.circular(12),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.play_circle_outline_rounded,
+                            size: 14, color: AppColors.oxfordNavy),
+                        SizedBox(width: 4),
+                        Text(
+                          '朗读例句',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.oxfordNavy,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 4),
             Text(

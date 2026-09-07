@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/local/app_database.dart';
 import '../../domain/models/word_item.dart';
 import '../../domain/models/listening_test_info.dart';
+import '../../domain/models/study_stats.dart';
 import '../../domain/audio/audio_player_service.dart';
 import '../../domain/fsrs/fsrs_algorithm.dart';
 import '../../domain/fsrs/fsrs_card.dart';
@@ -15,14 +16,36 @@ final fsrsAlgorithmProvider = Provider<FsrsAlgorithm>((ref) {
   return FsrsAlgorithm();
 });
 
-final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
+final Provider<AudioPlayerService> audioPlayerServiceProvider =
+    Provider<AudioPlayerService>((ref) {
   final service = AudioPlayerService();
+  final db = ref.read(databaseProvider);
+
+  service.onPlayStarted = () {
+    ref.read(audioCacheServiceProvider).stop();
+  };
+
+  service.onListeningTimeAccumulated = (seconds) async {
+    await db.recordListeningTime(seconds);
+    ref.invalidate(todayListeningStatsProvider);
+    ref.invalidate(overallPrepStatsProvider);
+  };
+
+  service.onSentenceRepeated = () async {
+    await db.recordSentenceRepeat();
+    ref.invalidate(todayListeningStatsProvider);
+  };
+
   ref.onDispose(() => service.dispose());
   return service;
 });
 
-final audioCacheServiceProvider = Provider<AudioCacheService>((ref) {
+final Provider<AudioCacheService> audioCacheServiceProvider =
+    Provider<AudioCacheService>((ref) {
   final service = AudioCacheService();
+  service.onAudioPlaybackStarting = () {
+    ref.read(audioPlayerServiceProvider).pause();
+  };
   ref.onDispose(() => service.dispose());
   return service;
 });
@@ -153,3 +176,16 @@ class GoogleDriveNotifier extends Notifier<GoogleDriveState> {
 final googleDriveProvider =
     NotifierProvider<GoogleDriveNotifier, GoogleDriveState>(
         GoogleDriveNotifier.new);
+
+// 学习统计数据 Providers
+final todayListeningStatsProvider =
+    FutureProvider<TodayListeningStats>((ref) async {
+  final db = ref.watch(databaseProvider);
+  return await db.getTodayListeningStats();
+});
+
+final overallPrepStatsProvider =
+    FutureProvider<OverallPrepStats>((ref) async {
+  final db = ref.watch(databaseProvider);
+  return await db.getOverallPrepStats();
+});

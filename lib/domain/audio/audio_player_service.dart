@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import '../models/listening_test_info.dart';
 
@@ -7,6 +8,10 @@ class AudioPlayerService {
   ListeningTestInfo? _currentTest;
   int _currentSentenceIndex = 0;
   bool _isSingleLoop = false;
+  VoidCallback? onPlayStarted;
+  Function(int seconds)? onListeningTimeAccumulated;
+  VoidCallback? onSentenceRepeated;
+  Timer? _listeningTickTimer;
 
   final StreamController<int> _sentenceIndexController =
       StreamController<int>.broadcast();
@@ -38,7 +43,16 @@ class AudioPlayerService {
     _sentenceIndexController.add(0);
 
     try {
-      // 优先从本地/远程加载音频源
+      // 优先从本地 assets 离线加载
+      if (test.localAudioPath.isNotEmpty) {
+        try {
+          await _player.setAsset(test.localAudioPath);
+          return;
+        } catch (_) {
+          // 本地资产加载失败时降级尝试网络源
+        }
+      }
+
       if (test.audioUrl.isNotEmpty) {
         await _player.setUrl(test.audioUrl);
       }
@@ -57,6 +71,7 @@ class AudioPlayerService {
     if (_isSingleLoop && _currentSentenceIndex < sentences.length) {
       final currentS = sentences[_currentSentenceIndex];
       if (posMs >= currentS.endMs) {
+        onSentenceRepeated?.call();
         _player.seek(Duration(milliseconds: currentS.startMs));
         return;
       }
@@ -74,8 +89,30 @@ class AudioPlayerService {
     }
   }
 
-  Future<void> play() => _player.play();
-  Future<void> pause() => _player.pause();
+  void _startListeningTracker() {
+    _listeningTickTimer?.cancel();
+    _listeningTickTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (_player.playing) {
+        onListeningTimeAccumulated?.call(5);
+      }
+    });
+  }
+
+  void _stopListeningTracker() {
+    _listeningTickTimer?.cancel();
+    _listeningTickTimer = null;
+  }
+
+  Future<void> play() async {
+    onPlayStarted?.call();
+    _startListeningTracker();
+    await _player.play();
+  }
+
+  Future<void> pause() async {
+    _stopListeningTracker();
+    await _player.pause();
+  }
 
   Future<void> togglePlay() async {
     if (_player.playing) {
@@ -98,6 +135,9 @@ class AudioPlayerService {
     if (_currentTest == null || _currentTest!.sentences.isEmpty) return;
     if (index < 0 || index >= _currentTest!.sentences.length) return;
 
+    if (index == _currentSentenceIndex) {
+      onSentenceRepeated?.call();
+    }
     _currentSentenceIndex = index;
     _sentenceIndexController.add(index);
     final targetSentence = _currentTest!.sentences[index];
@@ -106,6 +146,7 @@ class AudioPlayerService {
 
   Future<void> previousSentence() async {
     if (_currentSentenceIndex > 0) {
+      onSentenceRepeated?.call();
       await jumpToSentence(_currentSentenceIndex - 1);
     }
   }
@@ -124,6 +165,7 @@ class AudioPlayerService {
   }
 
   void dispose() {
+    _stopListeningTracker();
     _positionSub?.cancel();
     _sentenceIndexController.close();
     _singleLoopController.close();

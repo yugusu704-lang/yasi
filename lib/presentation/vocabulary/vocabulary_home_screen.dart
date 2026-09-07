@@ -36,8 +36,8 @@ class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
     ref.read(audioCacheServiceProvider).playWordUk(word);
   }
 
-  void _speakSentence(String sentence) {
-    ref.read(audioCacheServiceProvider).speakSentence(sentence);
+  void _speakSentence(String sentence, {String? word}) {
+    ref.read(audioCacheServiceProvider).speakSentence(sentence, word: word);
   }
 
   void _handleFsrsRating(
@@ -431,7 +431,8 @@ class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
                                       borderRadius: BorderRadius.circular(20)),
                                 ),
                                 onPressed: () => _speakSentence(
-                                    currentWord.contextSentenceEn),
+                                    currentWord.contextSentenceEn,
+                                    word: currentWord.word),
                                 icon: const Icon(Icons.play_arrow_rounded,
                                     size: 16),
                                 label: const Text('原声语境例句朗读',
@@ -801,23 +802,35 @@ class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
               child: Material(
                 color: Colors.transparent,
                 child: ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                   title: Row(
                     children: [
-                      Text(
-                        word.word,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'serif',
-                          color: AppColors.textPrimary,
+                      Flexible(
+                        child: Text(
+                          word.word,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'serif',
+                            color: AppColors.textPrimary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        word.phoneticUk,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppColors.textMuted),
-                      ),
+                      if (word.phoneticUk.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            word.phoneticUk,
+                            style: const TextStyle(
+                                fontSize: 12, color: AppColors.textMuted),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   subtitle: Column(
@@ -848,6 +861,10 @@ class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints:
+                            const BoxConstraints(minWidth: 32, minHeight: 32),
                         icon: const Icon(Icons.volume_up_rounded,
                             color: AppColors.ieltsCrimson, size: 20),
                         tooltip: '真人英音',
@@ -855,13 +872,21 @@ class _VocabularyHomeScreenState extends ConsumerState<VocabularyHomeScreen> {
                       ),
                       if (word.contextSentenceEn.isNotEmpty)
                         IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints:
+                              const BoxConstraints(minWidth: 32, minHeight: 32),
                           icon: const Icon(Icons.play_circle_outline_rounded,
                               color: AppColors.oxfordNavy, size: 20),
                           tooltip: '朗读例句',
                           onPressed: () =>
-                              _speakSentence(word.contextSentenceEn),
+                              _speakSentence(word.contextSentenceEn, word: word.word),
                         ),
                       IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints:
+                            const BoxConstraints(minWidth: 32, minHeight: 32),
                         icon: Icon(
                           word.isFavorite
                               ? Icons.bookmark_rounded

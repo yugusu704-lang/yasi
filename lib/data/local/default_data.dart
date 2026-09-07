@@ -14,9 +14,9 @@ class DefaultData {
           section: 1,
           title: 'Transport Survey - Commuter Feedback',
           audioUrl:
-              'https://actions.google.com/sounds/v1/ambiences/train_station.ogg',
+              'https://raw.githubusercontent.com/yugusu704-lang/yasi/main/assets/demo/c18_t1_s1.mp3',
           localAudioPath: 'assets/demo/c18_t1_s1.mp3',
-          totalDurationMs: 64500,
+          totalDurationMs: 65016,
           isDownloaded: true,
           playCount: 1,
           completionRate: 0.8,
@@ -96,7 +96,7 @@ class DefaultData {
             const SubtitleSentence(
               index: 0,
               startMs: 0,
-              endMs: 4200,
+              endMs: 5424,
               textEn:
                   'Good morning. Could you spare a few minutes to complete a transport survey?',
               textZh: '早上好。请问您能抽几分钟完成一份交通出行问卷调查吗？',
@@ -104,8 +104,8 @@ class DefaultData {
             ),
             const SubtitleSentence(
               index: 1,
-              startMs: 4300,
-              endMs: 8500,
+              startMs: 6224,
+              endMs: 10448,
               textEn:
                   'Sure, I have about ten minutes before my next train arrives.',
               textZh: '当然可以，距离我的下一趟火车进站还有大约十分钟。',
@@ -113,8 +113,8 @@ class DefaultData {
             ),
             const SubtitleSentence(
               index: 2,
-              startMs: 8600,
-              endMs: 14200,
+              startMs: 11248,
+              endMs: 18160,
               textEn:
                   'Great, thank you! First, can I take your full name and occupation for our records?',
               textZh: '太好了，谢谢您！首先，我能记录一下您的全名和职业吗？',
@@ -122,8 +122,8 @@ class DefaultData {
             ),
             const SubtitleSentence(
               index: 3,
-              startMs: 14300,
-              endMs: 19800,
+              startMs: 18960,
+              endMs: 24672,
               textEn:
                   "Yes, it's Luisa Gould, and I work as an environmental consultant in the city center.",
               textZh: '可以，我是路易莎·古尔德，我在市中心担任环境顾问。',
@@ -131,8 +131,8 @@ class DefaultData {
             ),
             const SubtitleSentence(
               index: 4,
-              startMs: 19900,
-              endMs: 26500,
+              startMs: 25472,
+              endMs: 31376,
               textEn:
                   'And what is the main purpose of your journey today? Is it for commuting or leisure?',
               textZh: '那么您今天出行的主要目的是什么？是通勤上班还是休闲出游？',
@@ -140,8 +140,8 @@ class DefaultData {
             ),
             const SubtitleSentence(
               index: 5,
-              startMs: 26600,
-              endMs: 33100,
+              startMs: 32176,
+              endMs: 38656,
               textEn:
                   'Mainly commuting. I take the railway line into town five days a week from Monday to Friday.',
               textZh: '主要是日常通勤。我周一到周五每周有五天都坐铁路线进城。',
@@ -149,8 +149,8 @@ class DefaultData {
             ),
             const SubtitleSentence(
               index: 6,
-              startMs: 33200,
-              endMs: 40500,
+              startMs: 39456,
+              endMs: 44784,
               textEn:
                   'How would you rate the punctuality and frequency of the train service during peak hours?',
               textZh: '在高峰时段，您对列车服务的准点率和发车频次评价如何？',
@@ -158,8 +158,8 @@ class DefaultData {
             ),
             const SubtitleSentence(
               index: 7,
-              startMs: 40600,
-              endMs: 48200,
+              startMs: 45584,
+              endMs: 52760,
               textEn:
                   'Punctuality is satisfactory, but the carriages are often overcrowded, especially between 8 and 9 AM.',
               textZh: '准点率令人满意，但车厢常常过度拥挤，尤其是早上八点到九点之间。',
@@ -167,8 +167,8 @@ class DefaultData {
             ),
             const SubtitleSentence(
               index: 8,
-              startMs: 48300,
-              endMs: 56000,
+              startMs: 53560,
+              endMs: 57856,
               textEn:
                   'Do you feel the monthly season ticket offers reasonable value for money?',
               textZh: '您觉得月度定期票的价格在性价比方面是否合理？',
@@ -176,8 +176,8 @@ class DefaultData {
             ),
             const SubtitleSentence(
               index: 9,
-              startMs: 56100,
-              endMs: 64500,
+              startMs: 58656,
+              endMs: 65328,
               textEn:
                   'Honestly, fares have increased significantly this year, so it is quite expensive for students and interns.',
               textZh: '老实说，今年票价上涨幅度很大，因此对学生和实习生来说相当昂贵。',
